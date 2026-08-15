@@ -1,0 +1,35 @@
+# Dependencies and package-manager state
+node_modules/
+.pnpm-store/
+
+# Build output and framework caches
+.next/
+out/
+dist/
+build/
+.turbo/
+.expo/
+web-build/
+coverage/
+
+# Local development files
+.DS_Store
+*.log
+*.local
+
+# Environment files and credentials
+.env
+.env.*
+!.env.example
+!.env.template
+.secrets/
+secrets/
+*.pem
+
+# Tool and editor state
+.vercel/
+.idea/
+.vscode/
+!.vscode/extensions.json
+!.vscode/settings.json
+
