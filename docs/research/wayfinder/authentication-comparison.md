@@ -1,6 +1,6 @@
 # Authentication provider comparison for web and Expo
 
-**Status:** research complete; recommendation is provisional and is not a user-approved architecture decision.
+**Status:** comparison reviewed; Auth0 decision accepted on 2026-08-15. Production implementation is deferred, and native validation is parked until mobile work begins.
 
 **Checked:** 2026-08-15
 
@@ -96,9 +96,15 @@ WorkOS is now a strong candidate alongside Auth0 and Clerk. Its differentiator i
 
 Auth.js, Better Auth, and Keycloak are not primary candidates for this decision because the requirement is managed/provider-built authentication. They are libraries or self-hosted approaches that would leave more identity lifecycle, hosting, or provider integration responsibility in this project. They can be reconsidered only if self-hosting or application-controlled authentication becomes an explicit requirement.
 
-## Provisional recommendation
+## Accepted decision
 
-Keep the provider decision open until a small, disposable spike compares **Auth0, Clerk, and WorkOS** against the same web/mobile/API acceptance tests. Supabase Auth remains documented as background research but is intentionally **out of this spike**. The earlier Auth0 recommendation remains a candidate recommendation, not a project decision.
+Use **Auth0** for the managed identity-provider boundary. Supabase Auth remains
+documented as background research but is intentionally **out of this spike**.
+Clerk and WorkOS remain useful comparison references, not selected providers.
+
+The native Expo portion is explicitly parked. The comparison's web/API evidence
+is the current decision evidence; a focused Auth0 native development-build test
+will be reopened when mobile implementation begins.
 
 Recommended boundary:
 
@@ -118,17 +124,15 @@ The architecture-independent boundary remains:
 - Authorization: household/workspace membership, roles, and resource sharing remain in the application database.
 - Data path: financial reads and writes go through the application API initially; direct provider data access is not required for v1.
 
-Current conditional lean:
+The comparison that led to the decision was:
 
-- **Auth0** if provider neutrality, explicit API audiences, and mature native OAuth patterns win.
-- **Clerk** if polished web/Expo account UX and speed win.
-- **WorkOS** if resource-scoped advisor/household sharing and future organization administration justify its FGA and native integration work.
+- **Auth0** wins for provider neutrality, explicit API audiences, and mature OAuth patterns across the future web/mobile boundary.
+- **Clerk** remains the strongest alternative for prebuilt Expo account UX.
+- **WorkOS** remains the strongest alternative if enterprise/advisor collaboration becomes a first-class requirement.
 
 Cognito remains conditional on an AWS-first platform decision, and Firebase remains conditional on a Firebase/Google data-plane decision.
 
-## Decision still required from the user
-
-Confirm the provider and these provider-independent boundaries:
+## Decision boundaries carried into implementation later
 
 - Web session: server-managed, encrypted, HttpOnly cookie rather than a browser refresh token.
 - Mobile session: Authorization Code + PKCE with rotating/revocable refresh credentials in OS secure storage.
@@ -137,7 +141,10 @@ Confirm the provider and these provider-independent boundaries:
 - Authorization: household/workspace membership, roles, and resource sharing remain in the application database.
 - Data path: financial reads and writes go through the application API initially; direct Supabase access is not required for v1.
 
-Once the provider is selected, update the authentication ticket and map, then re-evaluate the Auth0/Supabase/RLS portions of the backend and authorization work.
+The provider is selected, but these boundaries remain implementation inputs. The
+decision ticket is parked until implementation starts; the remaining follow-ups
+are tracked in [`authentication.md`](authentication.md) and
+[`auth0-implementation-handoff.md`](auth0-implementation-handoff.md).
 
 ## Sources checked
 

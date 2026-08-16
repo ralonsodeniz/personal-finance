@@ -1,7 +1,8 @@
 # Authorization model for users, households, roles, and scoped sharing
 
-**Wayfinder issue:** [#10 — Authorization Model for Users, Households, Roles, and Scoped Sharing](https://github.com/ralonsodeniz/personal-finance/issues/10)  
-**Date checked:** 2026-08-15  
+**Wayfinder issue:** [#10 — Authorization Model for Users, Households, Roles, and Scoped Sharing](https://github.com/ralonsodeniz/personal-finance/issues/10)
+**Date checked:** 2026-08-15
+**Decision status:** accepted by the user on 2026-08-15; implementation deferred to the post-Wayfinder phase
 **Scope:** architecture and v1 authorization semantics; no application-code changes
 
 ## Recommendation
@@ -11,6 +12,43 @@ Use Auth0 only to authenticate the principal. On every API request, validate the
 Keep the policy implementation as a small, pure, hand-rolled TypeScript domain module for v1. Store the authorization graph in PostgreSQL and make the API the mandatory enforcement point. If Supabase is used, enable PostgreSQL RLS on exposed tables as defense in depth, but keep its policies limited to a database-enforceable projection of the application rules. Do not put the complete household/resource graph in Auth0 claims or require a token refresh for revocation to take effect.
 
 This is proportionate to the current scope: one product, one TypeScript backend, a small fixed role set, and a relational sharing graph. CASL, Oso, or OpenFGA should be reconsidered only when policy duplication, policy complexity, or multi-service scale justifies their additional dependency and operational boundary.
+
+## Accepted v1 decisions
+
+- Every User receives one private personal Workspace. Users may belong to
+  multiple household Workspaces; personal-workspace merging or conversion is
+  deferred.
+- A household may have multiple owners. The final active owner cannot be removed
+  or demoted; ownership must be transferred explicitly before the last owner
+  leaves.
+- Household Membership is invitation-only with an expiring invitation and the
+  lifecycle `pending -> active -> revoked`. Membership roles provide broad
+  household access according to the role.
+- v1 supports individual Resource Grants for selective sharing, including with a
+  non-member advisor. Workspace-to-workspace Resource Grants are deferred.
+- Resource Grants are authenticated, view-only, finite-duration grants to one
+  Resource and explicitly approved descendants. There are no anonymous public
+  links or edit grants in v1.
+- Access is additive across valid Membership and individual Resource Grant
+  paths. Revoking one path does not remove another valid path.
+- `owner`, `editor`, and `viewer` are the v1 Membership roles. Editors may read,
+  change, import, and categorize permitted resources but cannot manage members,
+  roles, grants, or deletion. Viewers are read-only. Exports are owner-only.
+- Every protected user request is authenticated and authorized against current
+  application state. Authorization for writes and multi-step operations is
+  evaluated within the relevant transaction boundary.
+- The application API is the primary authorization authority. Exact PostgreSQL
+  RLS projections are deferred to the backend/database phase and must not become
+  a second source of truth.
+- Resource-level access is decided now; exact field visibility is deferred to
+  the finance-domain session. Unauthorized resources must not leak through
+  lists, searches, aggregates, reports, or exports.
+- Sharing, ownership transfer, export, deletion, and other high-impact actions
+  require recent authentication or step-up authentication.
+- Membership, role, ownership, invitation, grant, revocation, export, deletion,
+  and step-up events are auditable without recording tokens, credentials, or
+  financial payloads. Normal user-originated financial requests have no
+  authorization bypass.
 
 ## 1. Mapping Auth0 to internal `User` and `Identity`
 
@@ -115,7 +153,7 @@ Membership
   UNIQUE (workspace_id, user_id) for the current membership record
 ```
 
-Prefer the owner role in `Membership` over a second, competing ownership mechanism. Enforce the v1 invariant that every workspace has at least one active owner and that an owner cannot remove or demote the final owner. Whether v1 permits multiple owners, ownership transfer, or only one owner is an unresolved product decision, not something to infer from Auth0.
+Prefer the owner role in `Membership` over a second, competing ownership mechanism. Enforce the v1 invariant that every workspace has at least one active owner and that an owner cannot remove or demote the final owner.
 
 ### Resources and grants
 
@@ -125,20 +163,22 @@ Every financial resource belongs to exactly one workspace. Keep a typed resource
 ResourceGrant
   id
   resource_type, resource_id
-  grantee_type: user | workspace
-  grantee_id
+  grantee_user_id -> User.id
   permission: view                 (v1)
   granted_by_user_id
   created_at, expires_at, revoked_at
 ```
 
-For v1, use additive grants: absence of an applicable grant is deny, and there is no public/link-sharing mode or explicit deny row. A `user` grant can expose one selected resource without granting workspace listing. A `workspace` grant makes the resource available to active members of that workspace. This supports a household receiving selected accounts while keeping unrelated resources private. If the product instead requires every grantee to be a workspace member, make that a database invariant before implementation.
+For v1, use additive individual grants: absence of an applicable grant is deny,
+and there is no public/link-sharing mode, workspace-to-workspace grant, or
+explicit deny row. A grant can expose one selected resource without granting
+workspace listing or unrelated metadata.
 
 Effective access is the union of these paths, evaluated against current, non-revoked records:
 
 1. An active `owner` or `editor` membership grants the workspace's defined read/write actions over resources in that workspace.
 2. An active `viewer` membership grants read-only access over resources in that workspace.
-3. An active `ResourceGrant` grants only its declared permission to its target user, or to active members of its target workspace.
+3. An active `ResourceGrant` grants only its declared permission to its target user.
 4. A resource's declared parent grant may be inherited only along approved resource edges and only for actions explicitly listed by that edge.
 
 Never let a resource grant confer workspace administration, membership management, sharing authority, or access to sibling resources. Treat revocation, expiry, inactive membership, suspended/deleted user, archived workspace, and missing parent as hard deny conditions. Delete or retain revoked rows according to audit/retention policy, but do not reuse them as active state.
@@ -201,24 +241,27 @@ OpenFGA is a relationship-based authorization service. Its model uses typed obje
 
 Do not choose a product because the feature is called “fine-grained.” First preserve the relational model and policy contract. Re-evaluate a library or service when a concrete pressure appears: multiple APIs, custom roles, deep resource hierarchies, policy authors outside the TypeScript team, or measured policy duplication/latency problems.
 
-## 6. Decisions to resolve with the user before closing issue #10
+## Deferred follow-ups
 
-1. Is there exactly one personal workspace per user, may a user create more, and can a personal workspace be converted into or merged with a household workspace?
-2. Can a household have multiple owners, how is ownership transferred, and what happens when the final owner leaves or deletes their account?
-3. Is a selected-resource grant allowed to a non-member user, or must every grantee be a member of the containing household/workspace? If allowed, which workspace metadata is visible to that user?
-4. In v1, can resource grants be `view` only, or may they also be `edit`? Is there ever public/link sharing? The recommendation is no public sharing and `view` only initially.
-5. Which resources exist now, which are parents/children for inheritance, and exactly which data is included in “read” (descriptions, account identifiers, balances, transaction details, reports, exports, and attachments)?
-6. What can `editor` create, update, delete, import, export, or categorize? Can an editor delete a resource, or is delete owner-only? The matrix recommends owner-only deletion until decided.
-7. Must revocation be immediate for every API and Supabase path, and what is the policy for already downloaded/exported data and in-flight writes?
-8. Will clients access Supabase Data API/Storage/Realtime directly, or will all financial data go through the application API? This determines whether Auth0 third-party JWT integration and an RLS projection are required.
-9. If RLS is used with Auth0, will PostgreSQL policies identify principals by Auth0 `(iss, sub)` or by an internal `User.id` mapping, and how will the server-controlled mapping be established for each database request?
-10. Which administrative/service operations may bypass RLS, how are those credentials isolated, and which audit events are required for membership, grant, and revocation changes?
-11. Are step-up MFA or recent-authentication requirements needed for sharing, ownership transfer, export, or other high-impact financial actions? This is adjacent to the base authorization model but should be named before implementation.
+- Define the exact financial resource hierarchy and field-visibility matrix in
+  the later finance-domain session.
+- Coordinate the API, database, and eventual RLS projection with issue #14,
+  including the internal `User` mapping if any direct PostgreSQL path is later
+  introduced.
+- Define data retention, deletion, and already-exported-data handling with the
+  observability/security and export decisions in issue #13.
+- Revisit workspace-to-workspace grants, edit grants, public links, and a richer
+  authorization product only if a concrete product or scale requirement appears.
 
-Until these are answered, the safe closure statement is “authorization architecture selected; product semantics for workspace multiplicity, grant targets, resource inheritance, field visibility, and direct Supabase access remain open.”
+The authorization architecture is selected. These follow-ups are intentionally
+deferred and do not block closing issue #10 as a Wayfinder decision.
 
 ## Sources and limitations
 
 Sources are limited to primary documentation/specifications: [OIDC Core](https://openid.net/specs/openid-connect-core-1_0.html), [Auth0 user profiles](https://auth0.com/docs/manage-users/user-accounts/user-profiles/user-profile-structure), [Auth0 metadata](https://auth0.com/docs/manage-users/user-accounts/metadata), [Auth0 access-token validation](https://auth0.com/docs/secure/tokens/access-tokens/validate-access-tokens), [Auth0 token best practices](https://auth0.com/docs/secure/tokens/token-best-practices), [Supabase RLS](https://supabase.com/docs/guides/database/postgres/row-level-security), [Supabase third-party auth](https://supabase.com/docs/guides/auth/third-party/overview), [Supabase Auth0 integration](https://supabase.com/docs/guides/auth/third-party/auth0), [PostgreSQL row security](https://www.postgresql.org/docs/current/ddl-rowsecurity.html), [CASL](https://github.com/stalniy/casl), [Oso](https://docs.oso.dev/node/getting-started.html), and [OpenFGA](https://openfga.dev/docs/concepts).
 
-The note is an architecture recommendation, not a security audit or implementation. Supabase's Auth0 integration has provider-specific claim and signing-key requirements, and RLS cannot protect paths that use owner, superuser, `BYPASSRLS`, or service credentials unless those paths are separately controlled. The current issue body defines the requested scenarios but does not settle the unresolved product choices in §6; those require explicit user decisions before implementation.
+The note is an architecture decision, not a security audit or implementation.
+Supabase's Auth0 integration has provider-specific claim and signing-key
+requirements, and RLS cannot protect paths that use owner, superuser, `BYPASSRLS`,
+or service credentials unless those paths are separately controlled. No
+user-originated application request is allowed to bypass authorization.

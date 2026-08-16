@@ -1,8 +1,14 @@
 # Authentication provider and session strategy for web and mobile
 
-**Wayfinder issue:** [#9 — Authentication Provider and Session Strategy for Web and Mobile](https://github.com/ralonsodeniz/personal-finance/issues/9)  
-**Date checked:** 2026-08-15  
+**Wayfinder issue:** [#9 — Authentication Provider and Session Strategy for Web and Mobile](https://github.com/ralonsodeniz/personal-finance/issues/9)
+**Date checked:** 2026-08-15
+**Decision status:** accepted by the user on 2026-08-15; implementation deferred to the post-Wayfinder phase
 **Scope:** managed authentication only; no custom password, OAuth, session, or MFA implementation
+
+The deferred implementation reference is
+[`auth0-implementation-handoff.md`](auth0-implementation-handoff.md). It
+preserves reusable boundaries and spike evidence without turning this decision
+phase into production work.
 
 ## Question
 
