@@ -46,7 +46,7 @@ export async function GET(request: Request): Promise<Response> {
   });
 }
 
-export function POST(): Response {
+function methodNotAllowed(): Response {
   return problemResponse(
     createProblemDetails({
       detail: "Use GET to read system health.",
@@ -57,3 +57,10 @@ export function POST(): Response {
     { allow: "GET" },
   );
 }
+
+export const DELETE = methodNotAllowed;
+export const HEAD = methodNotAllowed;
+export const OPTIONS = methodNotAllowed;
+export const PATCH = methodNotAllowed;
+export const POST = methodNotAllowed;
+export const PUT = methodNotAllowed;

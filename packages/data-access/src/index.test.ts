@@ -17,6 +17,18 @@ describe("server-only system health data access", () => {
       provider: "provider-double",
     });
     expect(connection.queries.join("\n")).toContain("to_regclass");
+    expect(connection.queries.join("\n")).toContain("__drizzle_migrations");
+  });
+
+  it("reports pending migrations when the provider double says they are not ready", async () => {
+    const connection = createProviderDoubledPostgresConnection({ migrationReady: false });
+    const dataSource = createSystemHealthDataSource({ connection });
+
+    await expect(dataSource.check()).resolves.toEqual({
+      database: "ready",
+      migrations: "pending",
+      provider: "provider-double",
+    });
   });
 
   it("runs the committed migration through Drizzle against the provider double", async () => {

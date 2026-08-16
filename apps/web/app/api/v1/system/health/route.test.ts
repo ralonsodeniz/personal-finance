@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { GET, POST } from "./route";
+import { DELETE, GET, PATCH, POST } from "./route";
 
 describe("GET /api/v1/system/health", () => {
   it("returns a validated health response", async () => {
@@ -34,16 +34,18 @@ describe("GET /api/v1/system/health", () => {
   });
 
   it("uses the same problem shape for unsupported methods", async () => {
-    const response = await POST();
-    const body = await response.json();
+    for (const method of [POST, PATCH, DELETE]) {
+      const response = method();
+      const body = await response.json();
 
-    expect(response.status).toBe(405);
-    expect(response.headers.get("content-type")).toContain("application/problem+json");
-    expect(response.headers.get("allow")).toBe("GET");
-    expect(body).toMatchObject({
-      status: 405,
-      title: "Method not allowed",
-      type: "https://wayfinder.dev/problems/method-not-allowed",
-    });
+      expect(response.status).toBe(405);
+      expect(response.headers.get("content-type")).toContain("application/problem+json");
+      expect(response.headers.get("allow")).toBe("GET");
+      expect(body).toMatchObject({
+        status: 405,
+        title: "Method not allowed",
+        type: "https://wayfinder.dev/problems/method-not-allowed",
+      });
+    }
   });
 });

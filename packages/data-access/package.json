@@ -12,7 +12,8 @@
   },
   "dependencies": {
     "drizzle-orm": "0.45.2",
-    "pg": "8.23.0"
+    "pg": "8.23.0",
+    "server-only": "0.0.1"
   },
   "devDependencies": {
     "@personal-finance/config-eslint": "workspace:*",

@@ -1,3 +1,5 @@
+import "server-only";
+
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 
@@ -22,6 +24,10 @@ export interface SystemHealthDataSource {
 export interface ProviderDoubledPostgresConnection {
   queries: string[];
   query(config: QueryConfig | string): Promise<QueryResult<QueryResultRow>>;
+}
+
+export interface ProviderDoubledPostgresConnectionOptions {
+  migrationReady?: boolean;
 }
 
 interface SystemHealthQueryRow extends QueryResultRow {
@@ -53,7 +59,9 @@ function queryText(config: QueryConfig | string): string {
   return typeof config === "string" ? config : config.text;
 }
 
-export function createProviderDoubledPostgresConnection(): ProviderDoubledPostgresConnection {
+export function createProviderDoubledPostgresConnection({
+  migrationReady = true,
+}: ProviderDoubledPostgresConnectionOptions = {}): ProviderDoubledPostgresConnection {
   const connection: ProviderDoubledPostgresConnection = {
     queries: [],
     async query(config) {
@@ -61,7 +69,7 @@ export function createProviderDoubledPostgresConnection(): ProviderDoubledPostgr
       connection.queries.push(text);
 
       if (/select\s+1\s+as\s+database_ok/i.test(text)) {
-        return queryResult([{ database_ok: 1, migration_ready: true }]);
+        return queryResult([{ database_ok: 1, migration_ready: migrationReady }]);
       }
 
       if (/select id, hash, created_at/i.test(text)) {
@@ -89,7 +97,8 @@ async function checkThroughDrizzle(
     const result = await database.execute<SystemHealthQueryRow>(sql`
       SELECT
         1 AS database_ok,
-        to_regclass('public.wayfinder_system_health') IS NOT NULL AS migration_ready
+        to_regclass('public.wayfinder_system_health') IS NOT NULL
+          AND to_regclass('drizzle.__drizzle_migrations') IS NOT NULL AS migration_ready
     `);
     const row = result.rows[0];
 

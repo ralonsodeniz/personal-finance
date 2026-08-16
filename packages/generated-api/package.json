@@ -4,11 +4,13 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "generate": "node scripts/generate.mjs",
+    "check-generated": "node scripts/generate.mjs --check",
     "placeholder": "node ../../scripts/workspace-placeholder.mjs generated-api",
     "typecheck": "tsc --noEmit --project tsconfig.json",
     "lint": "node ../../scripts/workspace-lint.mjs",
     "format:check": "prettier --check .",
-    "test": "vitest run --config ../../vitest.config.mjs --passWithNoTests"
+    "test": "pnpm run check-generated && vitest run --config ../../vitest.config.mjs --passWithNoTests"
   },
   "devDependencies": {
     "@personal-finance/config-eslint": "workspace:*",

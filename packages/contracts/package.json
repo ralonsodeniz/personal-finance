@@ -22,6 +22,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./openapi": "./src/openapi.ts",
+    "./openapi.json": "./openapi.json",
     "./package.json": "./package.json"
   }
 }

@@ -28,15 +28,19 @@ browser / future Expo
        -> versioned HTTP contract only
 ```
 
-The generated client intentionally has no dependency on the application or
-data-access package. Drizzle and the PostgreSQL driver are confined to
-`@personal-finance/data-access`. The application service validates its result
-against the shared runtime contract before the Route Handler serializes it.
+The generated client is produced from `packages/contracts/openapi.json` with
+`pnpm --filter @personal-finance/generated-api generate`; its test task checks
+that the committed output is reproducible. It intentionally has no dependency
+on the application or data-access package. Drizzle and the PostgreSQL driver
+are confined to `@personal-finance/data-access`, which imports the `server-only`
+marker. The application service validates its result against the shared runtime
+contract before the Route Handler serializes it.
 
 ## Provider-free data check
 
 The data package uses Drizzle's PostgreSQL adapter for the health query and
-committed migration runner. Local verification does not require PostgreSQL:
+committed migration runner. Readiness checks both the non-financial marker
+table and Drizzle's migration-history table. Local verification does not require PostgreSQL:
 the default path uses a provider-doubled PostgreSQL connection with the same
 Drizzle execution seam. A real `DATABASE_URL` selects a PostgreSQL pool for
 runtime use. The only committed migration creates the non-financial
