@@ -1,0 +1,156 @@
+import { expect, test } from "@playwright/test";
+
+test.describe("production web/PWA shell", () => {
+  test("renders the public shell with its clear entry point", async ({ page }) => {
+    const response = await page.goto("/");
+
+    expect(response?.ok()).toBe(true);
+    await expect(page).toHaveTitle("Wayfinder — find the thread");
+    await expect(
+      page.getByRole("heading", { name: "Find the thread in your money." }),
+    ).toBeVisible();
+    await expect(page.getByRole("link", { name: "Enter the workspace" })).toHaveAttribute(
+      "href",
+      "/workspace",
+    );
+    await expect(page.locator("html")).toHaveAttribute("lang", "en");
+
+    const rootScope = new URL("/", page.url()).href;
+    await expect
+      .poll(
+        async () =>
+          page.evaluate(async () => {
+            if (!("serviceWorker" in navigator)) {
+              return [];
+            }
+
+            const registrations = await navigator.serviceWorker.getRegistrations();
+            return registrations.map((registration) => registration.scope);
+          }),
+        { timeout: 10_000 },
+      )
+      .toContain(rootScope);
+  });
+
+  test("serves an installability manifest and its icon", async ({ request }) => {
+    const manifestResponse = await request.get("/manifest.webmanifest");
+
+    expect(manifestResponse.ok()).toBe(true);
+    expect(manifestResponse.headers()["content-type"]).toContain("application/manifest+json");
+
+    const manifest = await manifestResponse.json();
+    expect(manifest).toMatchObject({
+      display: "standalone",
+      id: "/",
+      name: "Wayfinder — personal finance",
+      scope: "/",
+      start_url: "/",
+      theme_color: "#14252B",
+    });
+    expect(manifest.icons).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          purpose: "maskable",
+          sizes: "192x192",
+          src: "/icons/wayfinder-192.png",
+        }),
+        expect.objectContaining({
+          purpose: "maskable",
+          sizes: "512x512",
+          src: "/icons/wayfinder-512.png",
+        }),
+        expect.objectContaining({ purpose: "any", sizes: "any", src: "/icons/wayfinder-mark.svg" }),
+      ]),
+    );
+
+    for (const [iconPath, contentType] of [
+      ["/icons/wayfinder-192.png", "image/png"],
+      ["/icons/wayfinder-512.png", "image/png"],
+      ["/icons/wayfinder-mark.svg", "image/svg+xml"],
+    ] as const) {
+      const iconResponse = await request.get(iconPath);
+      expect(iconResponse.ok()).toBe(true);
+      expect(iconResponse.headers()["content-type"]).toContain(contentType);
+    }
+  });
+
+  test("serves the production Serwist service-worker asset", async ({ request }) => {
+    const serviceWorkerResponse = await request.get("/sw.js");
+
+    expect(serviceWorkerResponse.ok()).toBe(true);
+    expect(serviceWorkerResponse.headers()["content-type"]).toContain("javascript");
+    expect(serviceWorkerResponse.headers()["cache-control"]).toContain("no-cache");
+    expect(serviceWorkerResponse.headers()["service-worker-allowed"]).toBe("/");
+    expect((await serviceWorkerResponse.body()).byteLength).toBeGreaterThan(0);
+  });
+
+  test("uses an online-first offline fallback without caching private pages", async ({
+    context,
+    page,
+  }) => {
+    await page.goto("/");
+    await expect
+      .poll(
+        async () =>
+          page.evaluate(async () => {
+            const registration = await navigator.serviceWorker.ready;
+            return registration.scope;
+          }),
+        { timeout: 10_000 },
+      )
+      .toBe(new URL("/", page.url()).href);
+
+    await page.reload();
+    await expect
+      .poll(
+        async () => page.evaluate(() => navigator.serviceWorker.controller?.scriptURL ?? null),
+        {
+          timeout: 10_000,
+        },
+      )
+      .toBeTruthy();
+
+    const cachedUrls = await page.evaluate(async () => {
+      const cacheNames = await caches.keys();
+      const cachedRequests = await Promise.all(
+        cacheNames.map(async (cacheName) => (await caches.open(cacheName)).keys()),
+      );
+
+      return cachedRequests.flat().map((request) => new URL(request.url).pathname);
+    });
+
+    expect(
+      cachedUrls.some(
+        (pathname) =>
+          pathname === "/workspace" ||
+          pathname.startsWith("/api/") ||
+          pathname.startsWith("/_next/data/"),
+      ),
+    ).toBe(false);
+
+    await context.setOffline(true);
+    try {
+      const offlineResponse = await page.goto("/workspace");
+
+      expect(offlineResponse?.ok()).toBe(true);
+      await expect(page.getByText("Reconnect to load current financial data.")).toBeVisible();
+      await expect(page.locator("body")).not.toContainText(/\$\d|€\s?\d|£\s?\d/);
+    } finally {
+      await context.setOffline(false);
+    }
+  });
+
+  test("keeps the unauthenticated workspace boundary empty", async ({ page }) => {
+    const response = await page.goto("/workspace");
+
+    expect(response?.ok()).toBe(true);
+    await expect(page.locator("[data-auth-boundary='unauthenticated']")).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Your workspace starts with an identity." }),
+    ).toBeVisible();
+    await expect(
+      page.getByText("No workspace data is available until sign-in is connected."),
+    ).toBeVisible();
+    await expect(page.locator("body")).not.toContainText(/\$\d|€\s?\d|£\s?\d/);
+  });
+});
