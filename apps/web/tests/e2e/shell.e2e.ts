@@ -1,5 +1,12 @@
 import { expect, test } from "@playwright/test";
 
+import { IdentityDirectory, ProviderDouble } from "@personal-finance/auth";
+import {
+  createWebSession,
+  encryptWebSession,
+  WEB_SESSION_COOKIE_NAME,
+} from "../../app/lib/web-session-core";
+
 test.describe("production web/PWA shell", () => {
   test("renders the public shell with its clear entry point", async ({ page }) => {
     const response = await page.goto("/");
@@ -148,10 +155,46 @@ test.describe("production web/PWA shell", () => {
     await expect(
       page.getByRole("heading", { name: "Your workspace starts with an identity." }),
     ).toBeVisible();
-    await expect(
-      page.getByText("No workspace data is available until sign-in is connected."),
-    ).toBeVisible();
+    await expect(page.getByText(/No workspace data is available yet/)).toBeVisible();
+    await expect(page.locator("[data-auth-configuration='configured']")).toBeVisible();
     await expect(page.locator("body")).not.toContainText(/\$\d|€\s?\d|£\s?\d/);
+  });
+
+  test("recognizes the provider-double session without revealing protected content", async ({
+    context,
+    page,
+  }) => {
+    const provider = new ProviderDouble();
+    const identity = new IdentityDirectory().establish(
+      provider.authenticate({ subject: "double|browser-user" }),
+    );
+
+    await context.addCookies([
+      {
+        domain: "localhost",
+        httpOnly: true,
+        name: WEB_SESSION_COOKIE_NAME,
+        path: "/",
+        sameSite: "Lax",
+        secure: true,
+        value: encryptWebSession(
+          createWebSession({ identityId: identity.id, userId: identity.userId }),
+          "test-only-local-session-secret-not-a-credential",
+        ),
+      },
+    ]);
+
+    const response = await page.goto("/workspace");
+
+    expect(response?.ok()).toBe(true);
+    await expect(page.locator("[data-auth-boundary='authenticated']")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "The private line is open." })).toBeVisible();
+    await expect(page.locator("[data-protected-content='withheld']")).toBeVisible();
+    await expect(page.locator("[data-auth-node='data'] strong")).toHaveText("withheld");
+    await expect(page.locator("body")).not.toContainText(/\$\d|€\s?\d|£\s?\d/);
+
+    await page.getByRole("link", { name: "Sign out" }).click();
+    await expect(page.locator("[data-auth-boundary='unauthenticated']")).toBeVisible();
   });
 });
 

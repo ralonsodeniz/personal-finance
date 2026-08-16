@@ -11,10 +11,13 @@
     "lint": "node ../../scripts/workspace-lint.mjs",
     "format:check": "prettier --check .",
     "test": "vitest run --config ../../vitest.config.mjs --passWithNoTests",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "test:e2e:auth": "playwright test --config=playwright.dev.config.ts"
   },
   "dependencies": {
     "@personal-finance/application": "workspace:*",
+    "@personal-finance/auth": "workspace:*",
+    "@personal-finance/authorization": "workspace:*",
     "@personal-finance/contracts": "workspace:*",
     "@personal-finance/data-access": "workspace:*",
     "@personal-finance/design-tokens": "workspace:*",

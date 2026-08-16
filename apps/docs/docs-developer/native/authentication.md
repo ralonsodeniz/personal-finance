@@ -43,6 +43,32 @@ The shared boundary is the identity/session interface and the API's token
 validation contract. Storage mechanics, redirect handling, lifecycle events,
 and UI remain platform-specific.
 
+## Current web boundary
+
+The web implementation in `apps/web` now exercises this seam without a live
+Auth0 tenant:
+
+- `@personal-finance/auth` maps a verified provider identity to one internal
+  `Identity` keyed by the exact `(issuer, subject)` pair. Email and display
+  name remain profile data and never become the key.
+- The web session is an encrypted AES-GCM value in a server-managed,
+  `HttpOnly`, `SameSite=Lax` cookie. The `/workspace` Server Component reads
+  it on the server; browser JavaScript receives no application credential.
+  The codec is deliberately owned by the `apps/web` adapter because web
+  cookies and native credentials have different platform storage mechanics;
+  `@personal-finance/auth` remains the provider-neutral identity/session seam.
+- `AUTH_PROVIDER=double` enables the provider double for local verification.
+  It still requires a local `AUTH0_SECRET` for cookie encryption and has no
+  network or Auth0 credential dependency. Missing or invalid Auth0 settings
+  render the route as a safe, empty unavailable state.
+- `@personal-finance/authorization` accepts an internal application actor and
+  request, keeping authorization policy independent from Auth0 and the data
+  access implementation. Finance-domain permissions remain deferred.
+
+The provider-double login route is development-only. It exists to verify the
+authenticated placeholder state and must not be treated as an Auth0 login or
+as a production provisioning path.
+
 ## Still to implement
 
 The native Auth0 application, callback allowlists, universal/app links, token

@@ -89,6 +89,12 @@ importers:
       '@personal-finance/application':
         specifier: workspace:*
         version: link:../../packages/application
+      '@personal-finance/auth':
+        specifier: workspace:*
+        version: link:../../packages/auth
+      '@personal-finance/authorization':
+        specifier: workspace:*
+        version: link:../../packages/authorization
       '@personal-finance/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts

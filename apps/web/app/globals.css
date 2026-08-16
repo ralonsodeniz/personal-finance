@@ -519,6 +519,153 @@ a {
   padding: 1.5rem;
 }
 
+.workspace-boundary {
+  background:
+    linear-gradient(120deg, rgb(251 252 248 / 62%) 0 42%, transparent 42%),
+    radial-gradient(circle at 80% 18%, rgb(118 183 167 / 20%), transparent 25rem),
+    var(--color-background);
+}
+
+.workspace-boundary-frame {
+  max-width: 53rem;
+}
+
+.workspace-boundary-frame .wordmark {
+  margin-bottom: 2.5rem;
+}
+
+.workspace-gate {
+  display: grid;
+  grid-template-columns: 3.5rem minmax(0, 1fr);
+  overflow: hidden;
+  transform: rotate(-0.6deg);
+}
+
+.workspace-gate-rail {
+  align-items: center;
+  background: var(--color-surface-muted);
+  border-right: 1px solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  justify-content: space-between;
+  padding: 1.5rem 0.75rem;
+}
+
+.workspace-gate-rail > span:first-child {
+  color: var(--color-primary);
+  font-family: var(--font-utility);
+  font-size: 0.6rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  transform: rotate(180deg);
+  writing-mode: vertical-rl;
+}
+
+.workspace-gate-rail-mark {
+  color: var(--color-accent);
+  font-size: 1.35rem;
+  line-height: 1;
+}
+
+.workspace-gate-body {
+  min-width: 0;
+  padding: clamp(1.5rem, 4vw, 2.75rem);
+}
+
+.workspace-gate-header {
+  align-items: flex-start;
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+}
+
+.workspace-gate-header .eyebrow {
+  margin: 0;
+}
+
+.workspace-gate-heading {
+  padding: 1.75rem 0 0;
+}
+
+.workspace-gate-heading .card-title {
+  font-size: clamp(2.3rem, 6vw, 4.7rem);
+  line-height: 0.94;
+  max-width: 10ch;
+}
+
+.workspace-gate-heading .card-description {
+  max-width: 37rem;
+}
+
+.identity-ledger {
+  align-items: stretch;
+  display: grid;
+  gap: 0.7rem;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto minmax(0, 1fr);
+  margin-top: 2rem;
+}
+
+.identity-ledger-node {
+  background: var(--color-surface-muted);
+  border: 1px solid var(--color-border);
+  border-radius: 1rem 0.3rem 1rem 0.3rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 7.5rem;
+  padding: 1rem;
+}
+
+.identity-ledger-node .utility-label {
+  color: var(--color-primary);
+}
+
+.identity-ledger-node strong {
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  letter-spacing: -0.025em;
+}
+
+.identity-ledger-node small {
+  color: color-mix(in srgb, var(--color-foreground) 57%, transparent);
+  font-size: 0.75rem;
+  line-height: 1.35;
+}
+
+.identity-ledger-node--withheld {
+  background: transparent;
+  border-style: dashed;
+}
+
+.identity-ledger-node--withheld .utility-label,
+.identity-ledger-node--withheld strong {
+  color: color-mix(in srgb, var(--color-foreground) 58%, transparent);
+}
+
+.identity-ledger-arrow {
+  align-self: center;
+  color: var(--color-accent);
+  font-family: var(--font-utility);
+  font-size: 1.1rem;
+}
+
+.workspace-gate-actions {
+  padding: 1.75rem 0 0;
+}
+
+.workspace-gate-note {
+  border-top: 1px solid var(--color-border);
+  color: color-mix(in srgb, var(--color-foreground) 56%, transparent);
+  font-family: var(--font-utility);
+  font-size: 0.62rem;
+  letter-spacing: 0.07em;
+  line-height: 1.5;
+  margin: 1.75rem 0 0;
+  padding-top: 1rem;
+  text-transform: uppercase;
+}
+
 .boundary-frame {
   margin: auto;
   max-width: 34rem;
@@ -792,6 +939,50 @@ a {
 
   .system-health-card {
     padding: 1.5rem;
+  }
+
+  .workspace-boundary {
+    padding: 1rem;
+  }
+
+  .workspace-boundary-frame .wordmark {
+    margin-bottom: 1.75rem;
+  }
+
+  .workspace-gate {
+    display: block;
+    transform: none;
+  }
+
+  .workspace-gate-rail {
+    border-bottom: 1px solid var(--color-border);
+    border-right: 0;
+    flex-direction: row;
+    padding: 0.8rem 1rem;
+  }
+
+  .workspace-gate-rail > span:first-child {
+    transform: none;
+    writing-mode: horizontal-tb;
+  }
+
+  .workspace-gate-body {
+    padding: 1.5rem;
+  }
+
+  .workspace-gate-header {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .identity-ledger {
+    grid-template-columns: 1fr;
+  }
+
+  .identity-ledger-arrow {
+    justify-self: center;
+    transform: rotate(90deg);
   }
 
   .health-facts {

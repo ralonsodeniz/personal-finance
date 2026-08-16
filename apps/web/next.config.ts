@@ -16,6 +16,8 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   transpilePackages: [
     "@personal-finance/application",
+    "@personal-finance/auth",
+    "@personal-finance/authorization",
     "@personal-finance/contracts",
     "@personal-finance/data-access",
     "@personal-finance/design-tokens",
