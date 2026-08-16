@@ -2,6 +2,14 @@
   "name": "@personal-finance/design-tokens",
   "version": "0.0.0",
   "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./tokens.css": "./src/tokens.css"
+  },
   "scripts": {
     "placeholder": "node ../../scripts/workspace-placeholder.mjs design-tokens",
     "typecheck": "tsc --noEmit --project tsconfig.json",

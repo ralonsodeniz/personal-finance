@@ -6,3 +6,6 @@ minimumReleaseAge: 4320
 blockExoticSubdeps: true
 strictDepBuilds: true
 trustPolicy: no-downgrade
+allowBuilds:
+  "@swc/core": true
+  esbuild: true

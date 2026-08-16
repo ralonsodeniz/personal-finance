@@ -1,0 +1,27 @@
+:root {
+  --color-palette-basalt: #14252b;
+  --color-palette-salt: #edf2ed;
+  --color-palette-paper: #fbfcf8;
+  --color-palette-sea-glass: #76b7a7;
+  --color-palette-tide: #1a5362;
+  --color-palette-waypoint: #f3b548;
+  --color-palette-fog: #d8e3de;
+
+  --color-background: var(--color-palette-salt);
+  --color-foreground: var(--color-palette-basalt);
+  --color-surface: var(--color-palette-paper);
+  --color-surface-muted: var(--color-palette-fog);
+  --color-primary: var(--color-palette-tide);
+  --color-primary-foreground: var(--color-palette-paper);
+  --color-accent: var(--color-palette-waypoint);
+  --color-border: color-mix(in srgb, var(--color-palette-basalt) 16%, transparent);
+  --color-focus: var(--color-palette-tide);
+
+  --font-display: "Avenir Next", "Trebuchet MS", "Segoe UI", sans-serif;
+  --font-body: "Avenir Next", "Segoe UI", sans-serif;
+  --font-utility: "SFMono-Regular", "Roboto Mono", "Cascadia Code", monospace;
+
+  --radius-card: 1.5rem;
+  --radius-control: 0.75rem;
+  --shadow-card: 0 1.5rem 4rem rgb(20 37 43 / 10%);
+}

@@ -11,6 +11,7 @@ build/
 .expo/
 web-build/
 coverage/
+test-results/
 
 # Local development files
 .DS_Store
@@ -32,4 +33,3 @@ secrets/
 .vscode/
 !.vscode/extensions.json
 !.vscode/settings.json
-

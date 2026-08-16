@@ -3,16 +3,32 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
+    "dev": "next dev --turbopack",
+    "build": "next build --turbopack",
+    "start": "next start",
     "placeholder": "node ../../scripts/workspace-placeholder.mjs web",
-    "typecheck": "tsc --noEmit --project tsconfig.json",
+    "typecheck": "next typegen && tsc --noEmit --project tsconfig.json && tsc --noEmit --project service-worker/tsconfig.json",
     "lint": "node ../../scripts/workspace-lint.mjs",
     "format:check": "prettier --check .",
-    "test": "vitest run --config ../../vitest.config.mjs --passWithNoTests"
+    "test": "vitest run --config ../../vitest.config.mjs --passWithNoTests",
+    "test:e2e": "playwright test"
+  },
+  "dependencies": {
+    "@personal-finance/design-tokens": "workspace:*",
+    "@serwist/turbopack": "9.5.12",
+    "next": "16.3.0",
+    "react": "19.2.8",
+    "react-dom": "19.2.8"
   },
   "devDependencies": {
+    "@playwright/test": "1.62.1",
+    "@types/react": "19.2.18",
+    "@types/react-dom": "19.2.4",
     "@personal-finance/config-eslint": "workspace:*",
     "@personal-finance/config-prettier": "workspace:*",
     "@personal-finance/config-typescript": "workspace:*",
-    "@personal-finance/config-vitest": "workspace:*"
+    "@personal-finance/config-vitest": "workspace:*",
+    "esbuild": "0.28.2",
+    "serwist": "9.5.12"
   }
 }
