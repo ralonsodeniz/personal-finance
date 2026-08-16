@@ -45,6 +45,13 @@ describe("root quality gate", () => {
     expect(packageJson.scripts["verify:affected"]).toBe("node scripts/verify.mjs --affected");
     expect(packageJson.scripts["env:check"]).toBe("node scripts/validate-environment.mjs");
     expect(packageJson.scripts["secrets:check"]).toBe("node scripts/check-secret-safety.mjs");
+    expect(packageJson.scripts["docs:build"]).toBe("pnpm --filter @personal-finance/docs build");
+  });
+
+  it("runs the static documentation build in the root verification flow", () => {
+    const verifier = readFileSync(`${rootDirectory}/scripts/verify.mjs`, "utf8");
+
+    expect(verifier).toContain('["pnpm", ["run", "docs:build"]]');
   });
 
   it("accepts the committed environment example without provider credentials", () => {

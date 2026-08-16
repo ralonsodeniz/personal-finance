@@ -4,15 +4,29 @@
   "private": true,
   "scripts": {
     "placeholder": "node ../../scripts/workspace-placeholder.mjs docs",
+    "start": "docusaurus start",
+    "build": "docusaurus build",
+    "serve": "docusaurus serve --no-open",
     "typecheck": "tsc --noEmit --project tsconfig.json",
     "lint": "node ../../scripts/workspace-lint.mjs",
-    "format:check": "prettier --check .",
+    "format:check": "prettier --check . --ignore-path ../../.prettierignore",
     "test": "vitest run --config ../../vitest.config.mjs --passWithNoTests"
   },
   "devDependencies": {
+    "@docusaurus/core": "3.10.2",
+    "@docusaurus/module-type-aliases": "3.10.2",
+    "@docusaurus/plugin-content-docs": "3.10.2",
+    "@docusaurus/preset-classic": "3.10.2",
+    "@docusaurus/types": "3.10.2",
+    "@mdx-js/react": "3.1.1",
+    "@types/react": "19.2.18",
+    "@types/react-dom": "19.2.4",
     "@personal-finance/config-eslint": "workspace:*",
     "@personal-finance/config-prettier": "workspace:*",
     "@personal-finance/config-typescript": "workspace:*",
-    "@personal-finance/config-vitest": "workspace:*"
+    "@personal-finance/config-vitest": "workspace:*",
+    "prism-react-renderer": "2.4.1",
+    "react": "19.2.8",
+    "react-dom": "19.2.8"
   }
 }
