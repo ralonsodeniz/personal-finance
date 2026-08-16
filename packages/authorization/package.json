@@ -2,12 +2,17 @@
   "name": "@personal-finance/authorization",
   "version": "0.0.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "placeholder": "node ../../scripts/workspace-placeholder.mjs authorization",
     "typecheck": "tsc --noEmit --project tsconfig.json",
     "lint": "node ../../scripts/workspace-lint.mjs",
     "format:check": "prettier --check .",
     "test": "vitest run --config ../../vitest.config.mjs --passWithNoTests"
+  },
+  "exports": {
+    ".": "./src/index.ts",
+    "./package.json": "./package.json"
   },
   "devDependencies": {
     "@personal-finance/config-eslint": "workspace:*",

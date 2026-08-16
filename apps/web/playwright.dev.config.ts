@@ -1,27 +1,26 @@
 import { defineConfig, devices } from "@playwright/test";
 
-const port = Number(process.env.PLAYWRIGHT_PORT ?? "3100");
+const port = Number(process.env.PLAYWRIGHT_AUTH_PORT ?? "3101");
 const baseURL = `http://localhost:${port}`;
 
 export default defineConfig({
   forbidOnly: Boolean(process.env.CI),
-  fullyParallel: true,
   reporter: "list",
   testDir: "./tests/e2e",
-  testMatch: /shell\.e2e\.ts/,
+  testMatch: /provider-double\.e2e\.ts/,
   use: {
     baseURL,
     trace: "retain-on-failure",
     ...devices["Desktop Chrome"],
   },
   webServer: {
-    command: `pnpm build && pnpm start --hostname 127.0.0.1 --port ${port}`,
+    command: `pnpm dev --hostname 127.0.0.1 --port ${port}`,
     env: {
       ...process.env,
       AUTH0_SECRET: "test-only-local-session-secret-not-a-credential",
       AUTH_PROVIDER: "double",
+      NODE_ENV: "development",
     },
-    reuseExistingServer: process.env.PLAYWRIGHT_REUSE_SERVER === "true",
     timeout: 120_000,
     url: baseURL,
   },

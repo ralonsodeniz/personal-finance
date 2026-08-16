@@ -21,7 +21,7 @@ that each product capability has been implemented.
 | Package boundary         | Intended use                                                  | Important limit                                                                   |
 | ------------------------ | ------------------------------------------------------------- | --------------------------------------------------------------------------------- |
 | `packages/design-tokens` | Platform-neutral visual vocabulary and semantic roles         | UI components and platform styling remain owned by each app.                      |
-| `packages/auth`          | Provider-neutral identity and session interfaces              | Web cookies and native credentials need different adapters.                       |
+| `packages/auth`          | Provider-neutral identity and session interfaces              | Platform-specific web-cookie and native-credential adapters remain in their apps. |
 | `packages/authorization` | Application-owned authorization policy seam                   | Provider claims are not the source of truth for access decisions.                 |
 | `packages/contracts`     | Versioned wire-contract location                              | No finance-domain resources are defined in the bootstrap.                         |
 | `packages/generated-api` | Future generated client/types for browser and native callers  | It must not import server or persistence implementation types.                    |
