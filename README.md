@@ -1,13 +1,6 @@
 # personal-finance
 
-## Local authentication-provider spike
-
-Issue #16 has a guided setup wizard for the isolated Auth0, Clerk, and WorkOS
-development environments:
-
-```bash
-bash scripts/setup-auth-provider-spike.sh
-```
-
-The wizard writes local values to `.env.local`. Commit `.env.example`, never
-`.env.local`, provider exports, passwords, API keys, or private keys.
+This repository is in the Wayfinder architecture and monorepo-bootstrap phase.
+The accepted stack and implementation boundaries are recorded in the
+[Wayfinder recommendation review](docs/research/wayfinder/recommendation-review.md)
+and the [context map](CONTEXT-MAP.md).
