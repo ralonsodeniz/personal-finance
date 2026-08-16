@@ -86,6 +86,15 @@ importers:
 
   apps/web:
     dependencies:
+      '@personal-finance/application':
+        specifier: workspace:*
+        version: link:../../packages/application
+      '@personal-finance/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+      '@personal-finance/data-access':
+        specifier: workspace:*
+        version: link:../../packages/data-access
       '@personal-finance/design-tokens':
         specifier: workspace:*
         version: link:../../packages/design-tokens
@@ -129,6 +138,28 @@ importers:
       serwist:
         specifier: 9.5.12
         version: 9.5.12(browserslist@4.28.6)(typescript@5.9.3)
+
+  packages/application:
+    dependencies:
+      '@personal-finance/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@personal-finance/data-access':
+        specifier: workspace:*
+        version: link:../data-access
+    devDependencies:
+      '@personal-finance/config-eslint':
+        specifier: workspace:*
+        version: link:../config-eslint
+      '@personal-finance/config-prettier':
+        specifier: workspace:*
+        version: link:../config-prettier
+      '@personal-finance/config-typescript':
+        specifier: workspace:*
+        version: link:../config-typescript
+      '@personal-finance/config-vitest':
+        specifier: workspace:*
+        version: link:../config-vitest
 
   packages/auth:
     devDependencies:
@@ -179,6 +210,10 @@ importers:
   packages/config-vitest: {}
 
   packages/contracts:
+    dependencies:
+      zod:
+        specifier: 4.4.3
+        version: 4.4.3
     devDependencies:
       '@personal-finance/config-eslint':
         specifier: workspace:*
@@ -194,6 +229,16 @@ importers:
         version: link:../config-vitest
 
   packages/data-access:
+    dependencies:
+      drizzle-orm:
+        specifier: 0.45.2
+        version: 0.45.2(@types/pg@8.21.0)(pg@8.23.0)
+      pg:
+        specifier: 8.23.0
+        version: 8.23.0
+      server-only:
+        specifier: 0.0.1
+        version: 0.0.1
     devDependencies:
       '@personal-finance/config-eslint':
         specifier: workspace:*
@@ -207,6 +252,9 @@ importers:
       '@personal-finance/config-vitest':
         specifier: workspace:*
         version: link:../config-vitest
+      '@types/pg':
+        specifier: 8.21.0
+        version: 8.21.0
 
   packages/design-tokens:
     devDependencies:
@@ -2566,6 +2614,9 @@ packages:
   '@types/node@24.10.1':
     resolution: {integrity: sha512-GNWcUTRBgIRJD5zj+Tq0fKOJ5XZajIiBroOF0yvj2bSU1WvNdYS/dn9UxwsujGW4JX06dnHyjV2y9rRaybH0iQ==}
 
+  '@types/pg@8.21.0':
+    resolution: {integrity: sha512-AYdtudzabjLZgVgRZmAnU8bAnVUXzuJX2IYHeSIiIHm68olD+LgQYCGWdtcNYnP0uq9c4S4NibVG3Ni7VbKW7Q==}
+
   '@types/prismjs@1.26.6':
     resolution: {integrity: sha512-vqlvI7qlMvcCBbVe0AKAb4f97//Hy0EBTaiW8AalRnG/xAN5zOiWWyrNqNXeq8+KAuvRewjCVY1+IPxk4RdNYw==}
 
@@ -3516,6 +3567,98 @@ packages:
   dot-prop@6.0.1:
     resolution: {integrity: sha512-tE7ztYzXHIeyvc7N+hR3oi7FIbf/NIjVP9hmAt3yMXzrQ072/fpjGLx2GxNxGxUl5V73MEqYzioOMoVhGMJ5cA==}
     engines: {node: '>=10'}
+
+  drizzle-orm@0.45.2:
+    resolution: {integrity: sha512-kY0BSaTNYWnoDMVoyY8uxmyHjpJW1geOmBMdSSicKo9CIIWkSxMIj2rkeSR51b8KAPB7m+qysjuHme5nKP+E5Q==}
+    peerDependencies:
+      '@aws-sdk/client-rds-data': '>=3'
+      '@cloudflare/workers-types': '>=4'
+      '@electric-sql/pglite': '>=0.2.0'
+      '@libsql/client': '>=0.10.0'
+      '@libsql/client-wasm': '>=0.10.0'
+      '@neondatabase/serverless': '>=0.10.0'
+      '@op-engineering/op-sqlite': '>=2'
+      '@opentelemetry/api': ^1.4.1
+      '@planetscale/database': '>=1.13'
+      '@prisma/client': '*'
+      '@tidbcloud/serverless': '*'
+      '@types/better-sqlite3': '*'
+      '@types/pg': '*'
+      '@types/sql.js': '*'
+      '@upstash/redis': '>=1.34.7'
+      '@vercel/postgres': '>=0.8.0'
+      '@xata.io/client': '*'
+      better-sqlite3: '>=7'
+      bun-types: '*'
+      expo-sqlite: '>=14.0.0'
+      gel: '>=2'
+      knex: '*'
+      kysely: '*'
+      mysql2: '>=2'
+      pg: '>=8'
+      postgres: '>=3'
+      prisma: '*'
+      sql.js: '>=1'
+      sqlite3: '>=5'
+    peerDependenciesMeta:
+      '@aws-sdk/client-rds-data':
+        optional: true
+      '@cloudflare/workers-types':
+        optional: true
+      '@electric-sql/pglite':
+        optional: true
+      '@libsql/client':
+        optional: true
+      '@libsql/client-wasm':
+        optional: true
+      '@neondatabase/serverless':
+        optional: true
+      '@op-engineering/op-sqlite':
+        optional: true
+      '@opentelemetry/api':
+        optional: true
+      '@planetscale/database':
+        optional: true
+      '@prisma/client':
+        optional: true
+      '@tidbcloud/serverless':
+        optional: true
+      '@types/better-sqlite3':
+        optional: true
+      '@types/pg':
+        optional: true
+      '@types/sql.js':
+        optional: true
+      '@upstash/redis':
+        optional: true
+      '@vercel/postgres':
+        optional: true
+      '@xata.io/client':
+        optional: true
+      better-sqlite3:
+        optional: true
+      bun-types:
+        optional: true
+      expo-sqlite:
+        optional: true
+      gel:
+        optional: true
+      knex:
+        optional: true
+      kysely:
+        optional: true
+      mysql2:
+        optional: true
+      pg:
+        optional: true
+      postgres:
+        optional: true
+      prisma:
+        optional: true
+      sql.js:
+        optional: true
+      sqlite3:
+        optional: true
 
   dunder-proto@1.0.1:
     resolution: {integrity: sha512-KIN/nDJBQRcXw0MLVhZE9iQHmG68qAVIBg9CqmUYjmQIhgij9U5MFvrqkUL5FbtyyzZuOeOt0zdeRe4UY7ct+A==}
@@ -5056,6 +5199,40 @@ packages:
   pathe@2.0.3:
     resolution: {integrity: sha512-WUjGcAqP1gQacoQe+OBJsFA7Ld4DyXuUIjZ5cc75cLHvJ7dtNsTugphxIADwspS+AraAUePCKrSVtPLFj/F88w==}
 
+  pg-cloudflare@1.4.0:
+    resolution: {integrity: sha512-Vo7z/6rrQYxpNRylp4Tlob2elzbh+N/MOQbxFVWCxS7oEx6jF53GTJFxK2WWpKuBRkmiin4Mt+xofFDjx09R0A==}
+
+  pg-connection-string@2.14.0:
+    resolution: {integrity: sha512-XwWDGcLRGCXAR8F/AM5bG7Q+A3Wm2s6QeEjlOKZLlH3UYcguiqCWKyWXVag5TLTIjR7oOJUY8kcADaZgWPyLeg==}
+
+  pg-int8@1.0.1:
+    resolution: {integrity: sha512-WCtabS6t3c8SkpDBUlb1kjOs7l66xsGdKpIPZsg4wR+B3+u9UAum2odSsF9tnvxg80h4ZxLWMy4pRjOsFIqQpw==}
+    engines: {node: '>=4.0.0'}
+
+  pg-pool@3.14.0:
+    resolution: {integrity: sha512-gKtPkFdQPU3DksooVLi9LsjZxrsBUZIpa+7aVx+LV5pNh0KzP4Zleud2po+ConrxbuXGBJ6Hfer6hdgpIBpBaw==}
+    peerDependencies:
+      pg: '>=8.0'
+
+  pg-protocol@1.16.0:
+    resolution: {integrity: sha512-sILXutLVjCLjcDuOmvhX5e2Z4cS5qG/6Bu3VkpFwdf/633ElGLpEh9bgmuI5I4sqKqkifQiGyiCcx1HdtrK7tg==}
+
+  pg-types@2.2.0:
+    resolution: {integrity: sha512-qTAAlrEsl8s4OiEQY69wDvcMIdQN6wdz5ojQiOy6YRMuynxenON0O5oCpJI6lshc6scgAY8qvJ2On/p+CXY0GA==}
+    engines: {node: '>=4'}
+
+  pg@8.23.0:
+    resolution: {integrity: sha512-Ip2EQCngowJLGOfCwkFhPXU7/ljlhn6Rxlmy4XYfL2Y+vyRM59+8uR2xqRWKdYmbXmxCFOAmKxBuSUCdF34qLg==}
+    engines: {node: '>= 16.0.0'}
+    peerDependencies:
+      pg-native: '>=3.0.1'
+    peerDependenciesMeta:
+      pg-native:
+        optional: true
+
+  pgpass@1.0.5:
+    resolution: {integrity: sha512-FdW9r/jQZhSeohs1Z3sI1yxFQNFvMcnmfuj4WBMUTxOrAyLMaTcE1aAMBiTlbMNaXvBCQuVi0R7hd8udDSP7ug==}
+
   picocolors@1.1.1:
     resolution: {integrity: sha512-xceH2snhtb5M9liqDsmEw56le376mTZkEX/jEb/RxNFyegNul7eNslCXP9FDj/Lcu0X8KEyMceP2ntpaHrDEVA==}
 
@@ -5480,6 +5657,22 @@ packages:
     resolution: {integrity: sha512-u82N74LFzG8ca+dD8puPnplTXoGH4fTPpVGuIbt36G3qvNlkvfD0lEAZSxaly3KX8TS/L1A1gsCEmvKmBcVbkQ==}
     engines: {node: ^10 || ^12 || >=14}
 
+  postgres-array@2.0.0:
+    resolution: {integrity: sha512-VpZrUqU5A69eQyW2c5CA1jtLecCsN2U/bD6VilrFDWq5+5UIEVO7nazS3TEcHf1zuPYO/sqGvUvW62g86RXZuA==}
+    engines: {node: '>=4'}
+
+  postgres-bytea@1.0.1:
+    resolution: {integrity: sha512-5+5HqXnsZPE65IJZSMkZtURARZelel2oXUEO8rH83VS/hxH5vv1uHquPg5wZs8yMAfdv971IU+kcPUczi7NVBQ==}
+    engines: {node: '>=0.10.0'}
+
+  postgres-date@1.0.7:
+    resolution: {integrity: sha512-suDmjLVQg78nMK2UZ454hAG+OAW+HQPZ6n++TNDUX+L0+uUlLywnoxJKDou51Zm+zTCjrCl0Nq6J9C5hP9vK/Q==}
+    engines: {node: '>=0.10.0'}
+
+  postgres-interval@1.2.0:
+    resolution: {integrity: sha512-9ZhXKM/rw350N1ovuWHbGxnGh/SNJ4cnxHiM0rxE4VN41wsg8P8zWn9hv/buK00RP4WvlOyr/RBDiptyxVbkZQ==}
+    engines: {node: '>=0.10.0'}
+
   prelude-ls@1.2.1:
     resolution: {integrity: sha512-vkcDPrRZo1QZLbn5RLGPpg/WmIQ65qoWWhcGKf/b5eplkkarX0m9z8ppCat4mlOqUsWpyNuYgO3VRyrYHSzX5g==}
     engines: {node: '>= 0.8.0'}
@@ -5836,6 +6029,9 @@ packages:
     resolution: {integrity: sha512-x0RTqQel6g5SY7Lg6ZreMmsOzncHFU7nhnRWkKgWuMTu5NN0DR5oruckMqRvacAN9d5w6ARnRBXl9xhDCgfMeA==}
     engines: {node: '>= 0.8.0'}
 
+  server-only@0.0.1:
+    resolution: {integrity: sha512-qepMx2JxAa5jjfzxG79yPPq+8BuFToHd1hm7kI+Z4zAq1ftQiP7HcxMhDDItrbtwVeLg/cY2JnKnrcFkmiswNA==}
+
   serwist@9.5.12:
     resolution: {integrity: sha512-PwREKJrSb3ja40XJyBntPOm7okcYZJCJPd++jUVz8tzxY1VYO9dyKSm0MimZ8LtUk0pIUTN0q2cfGe7R0wQsaQ==}
     peerDependencies:
@@ -5963,6 +6159,10 @@ packages:
   spdy@4.0.2:
     resolution: {integrity: sha512-r46gZQZQV+Kl9oItvl1JZZqJKGr+oEkB08A6BzkiR7593/7IbtuncXHd2YoYeTsG4157ZssMu9KYvUHLcjcDoA==}
     engines: {node: '>=6.0.0'}
+
+  split2@4.2.0:
+    resolution: {integrity: sha512-UcjcJOWknrNkF6PLX83qcHM6KHgVKNkV62Y8a5uYDVv9ydGQVwAHMKqHdJje1VTWpljG0WYpCDhrCdAOYH4TWg==}
+    engines: {node: '>= 10.x'}
 
   srcset@4.0.0:
     resolution: {integrity: sha512-wvLeHgcVHKO8Sc/H/5lkGreJQVeYMm9rlmt8PuR1xE31rIuXhuzznUUqAt8MqLhB3MqJdFzlNAfpcWnxiFUcPw==}
@@ -6585,6 +6785,10 @@ packages:
     resolution: {integrity: sha512-7rVi2KMfwfWFl+GpPg6m80IVMWXLRjO+PxTq7V2CDhoGak0wzYzFgUY2m4XJ47OGdXd8eLE8EmwfAmdjw7lC1g==}
     hasBin: true
 
+  xtend@4.0.2:
+    resolution: {integrity: sha512-LKYU1iAXJXUgAXn9URjiu+MWhyUXHsvfp7mcuYm9dSUKK0/CjtrUwFAxD82/mCWbtLsGjFIad0wIsod4zrTAEQ==}
+    engines: {node: '>=0.4'}
+
   yallist@3.1.1:
     resolution: {integrity: sha512-a4UGQaWPH59mOXUYnAG2ewncQS4i4F43Tv3JoAM+s2VDAmS9NsK8GpDMLrCHPksFT7h3K6TOoUNn2pb7RoXx4g==}
 
@@ -6785,7 +6989,7 @@ snapshots:
     dependencies:
       '@babel/compat-data': 7.29.7
       '@babel/helper-validator-option': 7.29.7
-      browserslist: 4.28.6
+      browserslist: 4.28.8
       lru-cache: 5.1.1
       semver: 7.8.5
 
@@ -9740,6 +9944,12 @@ snapshots:
     dependencies:
       undici-types: 7.16.0
 
+  '@types/pg@8.21.0':
+    dependencies:
+      '@types/node': 24.10.1
+      pg-protocol: 1.16.0
+      pg-types: 2.2.0
+
   '@types/prismjs@1.26.6': {}
 
   '@types/qs@6.15.1': {}
@@ -10337,7 +10547,7 @@ snapshots:
 
   caniuse-api@3.0.0:
     dependencies:
-      browserslist: 4.28.6
+      browserslist: 4.28.8
       caniuse-lite: 1.0.30001809
       lodash.memoize: 4.1.2
       lodash.uniq: 4.5.0
@@ -10635,7 +10845,7 @@ snapshots:
 
   cssnano-preset-default@6.1.2(postcss@8.5.26):
     dependencies:
-      browserslist: 4.28.6
+      browserslist: 4.28.8
       css-declaration-sorter: 7.4.0(postcss@8.5.26)
       cssnano-utils: 4.0.2(postcss@8.5.26)
       postcss: 8.5.26
@@ -10810,6 +11020,11 @@ snapshots:
   dot-prop@6.0.1:
     dependencies:
       is-obj: 2.0.0
+
+  drizzle-orm@0.45.2(@types/pg@8.21.0)(pg@8.23.0):
+    optionalDependencies:
+      '@types/pg': 8.21.0
+      pg: 8.23.0
 
   dunder-proto@1.0.1:
     dependencies:
@@ -12687,6 +12902,41 @@ snapshots:
 
   pathe@2.0.3: {}
 
+  pg-cloudflare@1.4.0:
+    optional: true
+
+  pg-connection-string@2.14.0: {}
+
+  pg-int8@1.0.1: {}
+
+  pg-pool@3.14.0(pg@8.23.0):
+    dependencies:
+      pg: 8.23.0
+
+  pg-protocol@1.16.0: {}
+
+  pg-types@2.2.0:
+    dependencies:
+      pg-int8: 1.0.1
+      postgres-array: 2.0.0
+      postgres-bytea: 1.0.1
+      postgres-date: 1.0.7
+      postgres-interval: 1.2.0
+
+  pg@8.23.0:
+    dependencies:
+      pg-connection-string: 2.14.0
+      pg-pool: 3.14.0(pg@8.23.0)
+      pg-protocol: 1.16.0
+      pg-types: 2.2.0
+      pgpass: 1.0.5
+    optionalDependencies:
+      pg-cloudflare: 1.4.0
+
+  pgpass@1.0.5:
+    dependencies:
+      split2: 4.2.0
+
   picocolors@1.1.1: {}
 
   picomatch@2.3.2: {}
@@ -12753,7 +13003,7 @@ snapshots:
 
   postcss-colormin@6.1.0(postcss@8.5.26):
     dependencies:
-      browserslist: 4.28.6
+      browserslist: 4.28.8
       caniuse-api: 3.0.0
       colord: 2.9.3
       postcss: 8.5.26
@@ -12761,7 +13011,7 @@ snapshots:
 
   postcss-convert-values@6.1.0(postcss@8.5.26):
     dependencies:
-      browserslist: 4.28.6
+      browserslist: 4.28.8
       postcss: 8.5.26
       postcss-value-parser: 4.2.0
 
@@ -12885,7 +13135,7 @@ snapshots:
 
   postcss-merge-rules@6.1.1(postcss@8.5.26):
     dependencies:
-      browserslist: 4.28.6
+      browserslist: 4.28.8
       caniuse-api: 3.0.0
       cssnano-utils: 4.0.2(postcss@8.5.26)
       postcss: 8.5.26
@@ -12905,7 +13155,7 @@ snapshots:
 
   postcss-minify-params@6.1.0(postcss@8.5.26):
     dependencies:
-      browserslist: 4.28.6
+      browserslist: 4.28.8
       cssnano-utils: 4.0.2(postcss@8.5.26)
       postcss: 8.5.26
       postcss-value-parser: 4.2.0
@@ -12974,7 +13224,7 @@ snapshots:
 
   postcss-normalize-unicode@6.1.0(postcss@8.5.26):
     dependencies:
-      browserslist: 4.28.6
+      browserslist: 4.28.8
       postcss: 8.5.26
       postcss-value-parser: 4.2.0
 
@@ -13099,7 +13349,7 @@ snapshots:
 
   postcss-reduce-initial@6.1.0(postcss@8.5.26):
     dependencies:
-      browserslist: 4.28.6
+      browserslist: 4.28.8
       caniuse-api: 3.0.0
       postcss: 8.5.26
 
@@ -13160,6 +13410,16 @@ snapshots:
       nanoid: 3.3.18
       picocolors: 1.1.1
       source-map-js: 1.2.1
+
+  postgres-array@2.0.0: {}
+
+  postgres-bytea@1.0.1: {}
+
+  postgres-date@1.0.7: {}
+
+  postgres-interval@1.2.0:
+    dependencies:
+      xtend: 4.0.2
 
   prelude-ls@1.2.1: {}
 
@@ -13629,6 +13889,8 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
+  server-only@0.0.1: {}
+
   serwist@9.5.12(browserslist@4.28.6)(typescript@5.9.3):
     dependencies:
       '@serwist/utils': 9.5.12(browserslist@4.28.6)
@@ -13801,6 +14063,8 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
+  split2@4.2.0: {}
+
   srcset@4.0.0: {}
 
   stackback@0.0.2: {}
@@ -13877,7 +14141,7 @@ snapshots:
 
   stylehacks@6.1.1(postcss@8.5.26):
     dependencies:
-      browserslist: 4.28.6
+      browserslist: 4.28.8
       postcss: 8.5.26
       postcss-selector-parser: 6.1.4
 
@@ -14296,7 +14560,7 @@ snapshots:
       '@webassemblyjs/wasm-edit': 1.14.1
       '@webassemblyjs/wasm-parser': 1.14.1
       acorn: 8.18.0
-      browserslist: 4.28.6
+      browserslist: 4.28.8
       chrome-trace-event: 1.0.4
       enhanced-resolve: 5.24.5
       es-module-lexer: 2.3.1
@@ -14384,6 +14648,8 @@ snapshots:
   xml-js@1.6.11:
     dependencies:
       sax: 1.6.1
+
+  xtend@4.0.2: {}
 
   yallist@3.1.1: {}
 

@@ -35,6 +35,7 @@ packages/authorization   application-owned policy boundary
 packages/contracts       versioned API/domain contract boundary
 packages/generated-api   generated client/types boundary
 packages/data-access     server-only persistence boundary
+packages/application     shared server-side application-service boundary
 packages/telemetry       provider-neutral diagnostic/analytics boundary
 ```
 

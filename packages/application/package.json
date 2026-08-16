@@ -1,26 +1,24 @@
 {
-  "name": "@personal-finance/data-access",
+  "name": "@personal-finance/application",
   "version": "0.0.0",
   "private": true,
   "type": "module",
   "scripts": {
-    "placeholder": "node ../../scripts/workspace-placeholder.mjs data-access",
+    "placeholder": "node ../../scripts/workspace-placeholder.mjs application",
     "typecheck": "tsc --noEmit --project tsconfig.json",
     "lint": "node ../../scripts/workspace-lint.mjs",
     "format:check": "prettier --check .",
     "test": "vitest run --config ../../vitest.config.mjs --passWithNoTests"
   },
   "dependencies": {
-    "drizzle-orm": "0.45.2",
-    "pg": "8.23.0",
-    "server-only": "0.0.1"
+    "@personal-finance/contracts": "workspace:*",
+    "@personal-finance/data-access": "workspace:*"
   },
   "devDependencies": {
     "@personal-finance/config-eslint": "workspace:*",
     "@personal-finance/config-prettier": "workspace:*",
     "@personal-finance/config-typescript": "workspace:*",
-    "@personal-finance/config-vitest": "workspace:*",
-    "@types/pg": "8.21.0"
+    "@personal-finance/config-vitest": "workspace:*"
   },
   "exports": {
     ".": "./src/index.ts",
