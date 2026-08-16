@@ -9,6 +9,7 @@ const eslintEntryPoint = resolve(rootDirectory, "node_modules/eslint/bin/eslint.
 const lintableExtensions = new Set([".cjs", ".cts", ".js", ".mjs", ".mts", ".ts", ".tsx"]);
 const ignoredDirectories = new Set([
   ".next",
+  ".docusaurus",
   ".turbo",
   "build",
   "coverage",

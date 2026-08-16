@@ -1,6 +1,18 @@
 {
   "$schema": "https://json.schemastore.org/tsconfig",
   "extends": "../../packages/config-typescript/base.json",
-  "include": ["**/*.ts", "**/*.tsx", "**/*.mts", "**/*.cts"],
+  "compilerOptions": {
+    "allowJs": true,
+    "baseUrl": ".",
+    "jsx": "preserve",
+    "lib": ["ES2022", "DOM"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "paths": {
+      "@site/*": ["./*"]
+    },
+    "types": ["node", "@docusaurus/module-type-aliases", "react", "react-dom"]
+  },
+  "include": ["docusaurus.config.ts", "sidebars*.ts", "src/**/*.ts", "src/**/*.tsx"],
   "exclude": ["node_modules", "build", "dist", ".turbo"]
 }

@@ -18,6 +18,7 @@ export default tseslint.config(
   {
     ignores: [
       "**/.next/**",
+      "**/.docusaurus/**",
       "**/.turbo/**",
       "**/build/**",
       "**/coverage/**",

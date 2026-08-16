@@ -10,6 +10,8 @@
   "scripts": {
     "workspaces": "pnpm list --recursive --depth -1",
     "task": "turbo run placeholder --cache-dir .turbo/cache",
+    "docs:build": "pnpm --filter @personal-finance/docs build",
+    "docs:serve": "pnpm --filter @personal-finance/docs serve",
     "typecheck": "tsc --noEmit --project tsconfig.json",
     "lint": "eslint .",
     "format:check": "prettier --check .",

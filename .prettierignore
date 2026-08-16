@@ -1,4 +1,5 @@
 .next
+.docusaurus
 .turbo
 .pnpm-store
 build
