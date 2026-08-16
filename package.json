@@ -2,15 +2,31 @@
   "name": "personal-finance",
   "version": "0.0.0",
   "private": true,
+  "type": "module",
   "packageManager": "pnpm@11.21.0",
   "engines": {
     "node": ">=24.18.0 <25"
   },
   "scripts": {
     "workspaces": "pnpm list --recursive --depth -1",
-    "task": "turbo run placeholder --cache-dir .turbo/cache"
+    "task": "turbo run placeholder --cache-dir .turbo/cache",
+    "typecheck": "tsc --noEmit --project tsconfig.json",
+    "lint": "eslint .",
+    "format:check": "prettier --check .",
+    "test": "vitest run",
+    "env:check": "node scripts/validate-environment.mjs",
+    "secrets:check": "node scripts/check-secret-safety.mjs",
+    "verify": "node scripts/verify.mjs",
+    "verify:affected": "node scripts/verify.mjs --affected"
   },
   "devDependencies": {
-    "turbo": "2.10.9"
+    "@eslint/js": "10.0.1",
+    "@types/node": "24.10.1",
+    "eslint": "10.8.1",
+    "prettier": "3.9.6",
+    "turbo": "2.10.9",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.67.0",
+    "vitest": "4.1.10"
   }
 }

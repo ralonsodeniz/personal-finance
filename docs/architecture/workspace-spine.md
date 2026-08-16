@@ -28,7 +28,7 @@ install pass.
 ```text
 apps/web                 deployable web application boundary (shell later)
 apps/docs                deployable static documentation boundary (shell later)
-packages/config-*        shared tool-configuration boundaries
+packages/config-*        shared TypeScript/ESLint/Prettier/Vitest boundaries
 packages/design-tokens   platform-neutral visual vocabulary boundary
 packages/auth            identity/session interface boundary
 packages/authorization   application-owned policy boundary
@@ -38,14 +38,24 @@ packages/data-access     server-only persistence boundary
 packages/telemetry       provider-neutral diagnostic/analytics boundary
 ```
 
-Each workspace currently exposes only the uncached `placeholder` task. The
-root commands make the graph observable without requiring framework packages,
-provider credentials, or local application state:
+Each workspace exposes the shared `typecheck`, `lint`, `format:check`, and
+`test` tasks. Turborepo runs each task after the same task in its declared
+workspace dependencies, so changing shared configuration includes dependent
+checks in an affected run. The root commands make the graph authoritative
+without requiring framework packages, provider credentials, or local
+application state:
 
 ```text
 pnpm run workspaces
 pnpm run task
+pnpm run verify
+pnpm run verify:affected
 ```
+
+`verify` also runs the root TypeScript, ESLint, Prettier, and Vitest checks plus
+the provider-free environment and secret-safety checks. GitHub Actions runs
+the same full command and the affected command for pull requests after a
+full-history checkout.
 
 The web, documentation, framework, provider, and finance-domain implementations
 belong to later tickets. These manifests establish package ownership and

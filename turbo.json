@@ -1,6 +1,43 @@
 {
   "$schema": "https://turbo.build/schema.json",
+  "globalDependencies": [
+    ".env.example",
+    ".node-version",
+    ".prettierignore",
+    "eslint.config.mjs",
+    "prettier.config.mjs",
+    "scripts/workspace-lint.mjs",
+    "vitest.config.mjs",
+    "packages/config-eslint/index.mjs",
+    "packages/config-eslint/package.json",
+    "packages/config-eslint/tsconfig.json",
+    "packages/config-prettier/index.mjs",
+    "packages/config-prettier/package.json",
+    "packages/config-prettier/tsconfig.json",
+    "packages/config-typescript/base.json",
+    "packages/config-typescript/package.json",
+    "packages/config-typescript/tsconfig.json",
+    "packages/config-vitest/index.mjs",
+    "packages/config-vitest/package.json",
+    "packages/config-vitest/tsconfig.json"
+  ],
   "tasks": {
+    "typecheck": {
+      "dependsOn": ["^typecheck"],
+      "outputs": []
+    },
+    "lint": {
+      "dependsOn": ["^lint"],
+      "outputs": []
+    },
+    "format:check": {
+      "dependsOn": ["^format:check"],
+      "outputs": []
+    },
+    "test": {
+      "dependsOn": ["^test"],
+      "outputs": []
+    },
     "placeholder": {
       "cache": false
     }

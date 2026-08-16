@@ -3,6 +3,16 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
-    "placeholder": "node ../../scripts/workspace-placeholder.mjs web"
+    "placeholder": "node ../../scripts/workspace-placeholder.mjs web",
+    "typecheck": "tsc --noEmit --project tsconfig.json",
+    "lint": "node ../../scripts/workspace-lint.mjs",
+    "format:check": "prettier --check .",
+    "test": "vitest run --config ../../vitest.config.mjs --passWithNoTests"
+  },
+  "devDependencies": {
+    "@personal-finance/config-eslint": "workspace:*",
+    "@personal-finance/config-prettier": "workspace:*",
+    "@personal-finance/config-typescript": "workspace:*",
+    "@personal-finance/config-vitest": "workspace:*"
   }
 }
