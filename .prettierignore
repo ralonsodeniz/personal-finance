@@ -1,0 +1,11 @@
+.next
+.turbo
+.pnpm-store
+build
+coverage
+dist
+node_modules
+out
+pnpm-lock.yaml
+# Research notes are source artifacts with intentionally preserved prose layout.
+docs/research

@@ -2,7 +2,26 @@
   "name": "@personal-finance/config-eslint",
   "version": "0.0.0",
   "private": true,
+  "type": "module",
+  "files": [
+    "index.mjs"
+  ],
   "scripts": {
-    "placeholder": "node ../../scripts/workspace-placeholder.mjs config-eslint"
+    "placeholder": "node ../../scripts/workspace-placeholder.mjs config-eslint",
+    "typecheck": "tsc --noEmit --project tsconfig.json",
+    "lint": "node ../../scripts/workspace-lint.mjs",
+    "format:check": "prettier --check .",
+    "test": "vitest run --config ../../vitest.config.mjs --passWithNoTests"
+  },
+  "dependencies": {
+    "@eslint/js": "10.0.1",
+    "typescript-eslint": "8.67.0"
+  },
+  "peerDependencies": {
+    "eslint": ">=10.0.0 <11.0.0"
+  },
+  "exports": {
+    ".": "./index.mjs",
+    "./package.json": "./package.json"
   }
 }

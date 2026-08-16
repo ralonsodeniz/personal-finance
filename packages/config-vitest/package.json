@@ -1,19 +1,19 @@
 {
-  "name": "@personal-finance/config-typescript",
+  "name": "@personal-finance/config-vitest",
   "version": "0.0.0",
   "private": true,
+  "type": "module",
   "files": [
-    "base.json"
+    "index.mjs"
   ],
   "scripts": {
-    "placeholder": "node ../../scripts/workspace-placeholder.mjs config-typescript",
     "typecheck": "tsc --noEmit --project tsconfig.json",
     "lint": "node ../../scripts/workspace-lint.mjs",
     "format:check": "prettier --check .",
     "test": "vitest run --config ../../vitest.config.mjs --passWithNoTests"
   },
   "exports": {
-    "./base.json": "./base.json",
+    ".": "./index.mjs",
     "./package.json": "./package.json"
   }
 }
