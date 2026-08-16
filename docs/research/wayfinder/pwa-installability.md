@@ -1,7 +1,7 @@
 # PWA Installability and Online-First Runtime Strategy
 
-**Date checked:** 2026-08-15  
-**Repository:** ralonsodeniz/personal-finance  
+**Date checked:** 2026-08-15
+**Repository:** ralonsodeniz/personal-finance
 **Wayfinder ticket:** [PWA Installability and Online-First Runtime Strategy](https://github.com/ralonsodeniz/personal-finance/issues/2)
 
 ## Question
@@ -123,7 +123,7 @@ Workbox's first-party documentation says generateSW is appropriate when precachi
 
 Workbox describes injectManifest as the mode for a custom worker that needs custom routing, strategies, or other platform features such as Web Push. It leaves the worker logic under application control and injects the build's precache entries into a placeholder. See [workbox-build](https://developer.chrome.com/docs/workbox/modules/workbox-build), [Precaching with Workbox](https://developer.chrome.com/docs/workbox/precaching-with-workbox), and [The ways of Workbox](https://developer.chrome.com/docs/workbox/the-ways-of-workbox).
 
-Serwist is a first-party project documentation and source option that provides a TypeScript-oriented Workbox-compatible integration. Its [Next.js getting-started guide](https://serwist.pages.dev/docs/next/getting-started) shows app/sw.ts, a generated public/sw.js, an injected precache manifest, and an additional offline entry. The guide separates the Webpack integration from a [Turbopack quick guide](https://serwist.pages.dev/docs/next/turbo). The current Next.js PWA guide also points to Serwist for offline support and notes a Webpack requirement in its example, so the exact integration must be verified against the selected Next.js version and bundler before it is locked.
+Serwist is a first-party project documentation and source option that provides a TypeScript-oriented Workbox-compatible integration. Its [Next.js getting-started guide](https://serwist.pages.dev/docs/next/getting-started) shows app/sw.ts, a generated public/sw.js, an injected precache manifest, and an additional offline entry. The guide separates the Webpack integration from a [Turbopack quick guide](https://serwist.pages.dev/docs/next/turbo). The current Next.js PWA guide also points to Serwist for offline support and notes a Webpack requirement in its example. The project's [Serwist + Next.js/Turbopack compatibility spike](./serwist-turbopack-spike.md) passed the production build path; actual preview deployment remains implementation verification. Local development remains a deliberate no-service-worker mode because the disposable Turbopack fixture hit file-watcher limits.
 
 **Advantages**
 
@@ -151,7 +151,7 @@ Adopt a **standards-first, online-first PWA with one custom, root-scoped service
 
 1. **Manifest:** use Next.js App Router's app/manifest.ts and MetadataRoute.Manifest. Next.js officially supports both static and generated manifests; see [manifest.json metadata files](https://nextjs.org/docs/app/api-reference/file-conventions/metadata/manifest). Include a stable application ID, name/short name, start URL, scope, standalone display mode, theme/background colors, and at least 192px and 512px icons. Add maskable icon variants when the icon design is ready.
 2. **Service-worker ownership:** keep the source worker within apps/web and emit it as an un-hashed /sw.js at the root of the web origin. Register it only from browser code, with an explicit root scope and updateViaCache: "none" (the current Next.js PWA guide uses this registration option). Do not place the worker in a shared domain package and do not register a second worker for the same app origin.
-3. **Build integration:** use a custom-worker injectManifest flow. Prefer the maintained Serwist Next/Turbopack integration that matches the chosen Next.js release after a minimal build-and-deploy spike; use Workbox's framework-agnostic injectManifest build path if bundler integration is not reliable. The policy is the important decision; the plugin is an implementation detail that must pass the spike.
+3. **Build integration:** use a custom-worker injectManifest flow through Serwist's Next/Turbopack integration. The compatibility spike passed for the production build path. Disable worker registration in local development and validate PWA behavior with production builds and deployed previews. Keep Workbox's framework-agnostic injectManifest build path as the fallback if a future Next.js/Turbopack upgrade breaks the Serwist integration. The policy is the important decision; the plugin must remain replaceable.
 4. **Caching:** precache only safe, immutable static assets and one generic offline document. Use network-only behavior for authenticated application navigation, Next RSC/data requests, Server Actions, and all financial API requests. Use cache-first only for assets that are content-addressed or otherwise explicitly versioned. Never cache a response merely because it is a successful GET.
 5. **Failures:** if a navigation cannot reach the network, return the generic offline document and explain that current financial data is unavailable. Do not render previously cached balances, transactions, or user-specific HTML as if they were current. If the worker fails to install or activate, continue as a normal online web application and report the operational signal.
 6. **Updates:** leave the new worker waiting by default. Show an update prompt, protect unsaved form state, activate only after user confirmation, then reload after the new worker controls the page. Version caches and deploy the worker plus the assets it references atomically.
@@ -356,7 +356,7 @@ These follow-ups are now precise enough for later architecture tickets:
 
 1. **Web origin and route boundary:** Decide whether the financial app gets a dedicated origin/subdomain and what stable path is used for the app root, login, and dashboard.
 2. **Authentication transport:** Decide cookie/session versus another transport, redirect callback URLs, CSRF policy, and standalone-app behavior. Verify the chosen auth solution on iOS Home Screen web apps.
-3. **Next.js and service-worker build spike:** Build the smallest App Router app with the selected Next.js version, default Turbopack, the Serwist Turbopack/Next integration, and the Workbox injectManifest fallback. Verify emitted /sw.js, root scope, precache entries, headers, preview deployment, update prompt, and rollback.
+3. **Next.js and service-worker build spike:** **Completed 2026-08-16 for the production build gate.** The isolated fixture passed typecheck, Turbopack build, worker generation, precache generation, root-scope headers, and production-server smoke tests. Local development keeps service-worker registration disabled; actual preview deployment, update prompt, rollback, and the browser matrix remain implementation verification.
 4. **Hosting/deployment atomicity:** Choose the hosting/CDN model and prove that worker and immutable assets are deployed together and that /sw.js is not served stale.
 5. **Browser support matrix:** Set minimum supported versions and test install, standalone storage/session behavior, service-worker lifecycle, and push capability separately for Chrome/Edge/Firefox/Safari/iOS.
 6. **Backend cache headers:** Define Cache-Control and related headers for login, session, authorization, financial APIs, exports, and static assets. Verify both HTTP caches and service-worker routes.
