@@ -14,6 +14,9 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
+    "@personal-finance/application": "workspace:*",
+    "@personal-finance/contracts": "workspace:*",
+    "@personal-finance/data-access": "workspace:*",
     "@personal-finance/design-tokens": "workspace:*",
     "@serwist/turbopack": "9.5.12",
     "next": "16.3.0",

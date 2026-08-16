@@ -14,7 +14,12 @@ const nextConfig: NextConfig = {
   },
   poweredByHeader: false,
   reactStrictMode: true,
-  transpilePackages: ["@personal-finance/design-tokens"],
+  transpilePackages: [
+    "@personal-finance/application",
+    "@personal-finance/contracts",
+    "@personal-finance/data-access",
+    "@personal-finance/design-tokens",
+  ],
   async rewrites() {
     return [{ destination: "/serwist/sw.js", source: "/sw.js" }];
   },

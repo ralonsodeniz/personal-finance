@@ -1,17 +1,18 @@
 {
-  "name": "@personal-finance/contracts",
+  "name": "@personal-finance/application",
   "version": "0.0.0",
   "private": true,
   "type": "module",
   "scripts": {
-    "placeholder": "node ../../scripts/workspace-placeholder.mjs contracts",
+    "placeholder": "node ../../scripts/workspace-placeholder.mjs application",
     "typecheck": "tsc --noEmit --project tsconfig.json",
     "lint": "node ../../scripts/workspace-lint.mjs",
     "format:check": "prettier --check .",
     "test": "vitest run --config ../../vitest.config.mjs --passWithNoTests"
   },
   "dependencies": {
-    "zod": "4.4.3"
+    "@personal-finance/contracts": "workspace:*",
+    "@personal-finance/data-access": "workspace:*"
   },
   "devDependencies": {
     "@personal-finance/config-eslint": "workspace:*",
@@ -21,7 +22,6 @@
   },
   "exports": {
     ".": "./src/index.ts",
-    "./openapi": "./src/openapi.ts",
     "./package.json": "./package.json"
   }
 }

@@ -2,6 +2,7 @@
   "name": "@personal-finance/generated-api",
   "version": "0.0.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "placeholder": "node ../../scripts/workspace-placeholder.mjs generated-api",
     "typecheck": "tsc --noEmit --project tsconfig.json",
@@ -14,5 +15,9 @@
     "@personal-finance/config-prettier": "workspace:*",
     "@personal-finance/config-typescript": "workspace:*",
     "@personal-finance/config-vitest": "workspace:*"
+  },
+  "exports": {
+    ".": "./src/index.ts",
+    "./package.json": "./package.json"
   }
 }

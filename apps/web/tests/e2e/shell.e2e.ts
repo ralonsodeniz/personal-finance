@@ -154,3 +154,50 @@ test.describe("production web/PWA shell", () => {
     await expect(page.locator("body")).not.toContainText(/\$\d|€\s?\d|£\s?\d/);
   });
 });
+
+test.describe("system health boundary", () => {
+  test("serves the OpenAPI document and versioned health response", async ({ request }) => {
+    const openApiResponse = await request.get("/api/v1/openapi.json");
+
+    expect(openApiResponse.ok()).toBe(true);
+    expect(openApiResponse.headers()["content-type"]).toContain("application/json");
+    expect(await openApiResponse.json()).toMatchObject({
+      openapi: "3.1.0",
+      paths: { "/system/health": { get: { operationId: "getSystemHealth" } } },
+    });
+
+    const healthResponse = await request.get("/api/v1/system/health?scope=system");
+
+    expect(healthResponse.ok()).toBe(true);
+    expect(healthResponse.headers()["cache-control"]).toContain("no-store");
+    expect(await healthResponse.json()).toMatchObject({
+      contractVersion: "v1",
+      data: { database: "ready", migrations: "ready", provider: "provider-double" },
+      service: "wayfinder",
+      status: "ok",
+    });
+
+    const invalidResponse = await request.get("/api/v1/system/health?scope=finance");
+
+    expect(invalidResponse.status()).toBe(400);
+    expect(invalidResponse.headers()["content-type"]).toContain("application/problem+json");
+    expect(await invalidResponse.json()).toMatchObject({
+      status: 400,
+      title: "Invalid request",
+      type: "https://wayfinder.dev/problems/invalid-request",
+    });
+  });
+
+  test("renders the direct service proof at a representative mobile size", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    const response = await page.goto("/system-health");
+
+    expect(response?.ok()).toBe(true);
+    await expect(page).toHaveTitle("Wayfinder — find the thread");
+    await expect(page.getByRole("heading", { name: "The boundary is awake." })).toBeVisible();
+    await expect(page.locator("[data-health-source='application-service']")).toBeVisible();
+    await expect(page.locator("[data-health-database='ready']")).toHaveText("ready");
+    await expect(page.locator("[data-health-migrations='ready']")).toHaveText("ready");
+    await expect(page.locator("body")).not.toContainText(/\$\d|€\s?\d|£\s?\d/);
+  });
+});
