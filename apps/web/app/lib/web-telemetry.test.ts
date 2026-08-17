@@ -97,6 +97,23 @@ describe("web shell telemetry", () => {
     });
   });
 
+  it("does not consume a preview PostHog key until telemetry is explicitly approved", () => {
+    vi.stubEnv("APP_ENV", "preview");
+    vi.stubEnv("VERCEL_ENV", "preview");
+    vi.stubEnv("WAYFINDER_PREVIEW_NEXT_PUBLIC_POSTHOG_HOST", POSTHOG_EU_HOST);
+    vi.stubEnv("WAYFINDER_PREVIEW_NEXT_PUBLIC_POSTHOG_KEY", "phc_preview_test_key");
+    vi.stubEnv("WAYFINDER_PREVIEW_TELEMETRY_MODE", "disabled");
+
+    try {
+      expect(createWebShellTelemetry().shellViewed()).toMatchObject({
+        operational: { status: "disabled" },
+        productAnalytics: { status: "disabled" },
+      });
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
   it("registers OpenTelemetry, Sentry, and EU PostHog runtime adapters", () => {
     const openTelemetry = { emitDiagnostic: vi.fn() };
     const sentry = { captureDiagnostic: vi.fn() };

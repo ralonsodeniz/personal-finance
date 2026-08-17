@@ -1,30 +1,23 @@
 {
-  "name": "@personal-finance/data-access",
+  "name": "@personal-finance/jobs",
   "version": "0.0.0",
   "private": true,
   "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./package.json": "./package.json"
+  },
   "scripts": {
-    "placeholder": "node ../../scripts/workspace-placeholder.mjs data-access",
+    "placeholder": "node ../../scripts/workspace-placeholder.mjs jobs",
     "typecheck": "tsc --noEmit --project tsconfig.json",
     "lint": "node ../../scripts/workspace-lint.mjs",
     "format:check": "prettier --check .",
     "test": "vitest run --config ../../vitest.config.mjs --passWithNoTests"
   },
-  "dependencies": {
-    "@personal-finance/config-environment": "workspace:*",
-    "drizzle-orm": "0.45.2",
-    "pg": "8.23.0",
-    "server-only": "0.0.1"
-  },
   "devDependencies": {
     "@personal-finance/config-eslint": "workspace:*",
     "@personal-finance/config-prettier": "workspace:*",
     "@personal-finance/config-typescript": "workspace:*",
-    "@personal-finance/config-vitest": "workspace:*",
-    "@types/pg": "8.21.0"
-  },
-  "exports": {
-    ".": "./src/index.ts",
-    "./package.json": "./package.json"
+    "@personal-finance/config-vitest": "workspace:*"
   }
 }

@@ -3,6 +3,7 @@ import "server-only";
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 
+import { getScopedEnvironment } from "@personal-finance/config-environment";
 import { sql } from "drizzle-orm";
 import { drizzle, type NodePgClient, type NodePgDatabase } from "drizzle-orm/node-postgres";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
@@ -134,7 +135,7 @@ export interface SystemHealthDataSourceOptions {
 
 export function createSystemHealthDataSource({
   connection,
-  databaseUrl = process.env.DATABASE_URL,
+  databaseUrl = getScopedEnvironment(process.env).DATABASE_URL,
 }: SystemHealthDataSourceOptions = {}): SystemHealthDataSource {
   if (connection) {
     const database = drizzle(asNodePgClient(connection));

@@ -17,8 +17,9 @@ export default defineConfig({
     command: `pnpm dev --hostname 127.0.0.1 --port ${port}`,
     env: {
       ...process.env,
-      AUTH0_SECRET: "test-only-local-session-secret-not-a-credential",
-      AUTH_PROVIDER: "double",
+      APP_ENV: "development",
+      WAYFINDER_DEVELOPMENT_AUTH0_SECRET: "development-only-session-secret-not-a-credential",
+      WAYFINDER_DEVELOPMENT_AUTH_PROVIDER: "double",
       NODE_ENV: "development",
     },
     timeout: 120_000,

@@ -83,4 +83,25 @@ describe("provider-double web session adapter", () => {
       true,
     );
   });
+
+  it("allows an explicitly provider-doubled preview without enabling the double in production", () => {
+    const previewEnvironment = {
+      APP_ENV: "preview",
+      WAYFINDER_PREVIEW_AUTH0_SECRET: secret,
+      WAYFINDER_PREVIEW_AUTH_PROVIDER: "double",
+      NODE_ENV: "production",
+    };
+
+    expect(isProviderDoubleEnabled(previewEnvironment)).toBe(true);
+    expect(createProviderDoubleSessionValue({ environment: previewEnvironment })).toMatchObject({
+      status: "configured",
+    });
+    expect(
+      isProviderDoubleEnabled({
+        APP_ENV: "production",
+        WAYFINDER_PRODUCTION_AUTH_PROVIDER: "double",
+        NODE_ENV: "production",
+      }),
+    ).toBe(false);
+  });
 });

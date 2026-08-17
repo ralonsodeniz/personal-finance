@@ -18,6 +18,7 @@ const nextConfig: NextConfig = {
     "@personal-finance/application",
     "@personal-finance/auth",
     "@personal-finance/authorization",
+    "@personal-finance/config-environment",
     "@personal-finance/contracts",
     "@personal-finance/data-access",
     "@personal-finance/design-tokens",

@@ -16,6 +16,33 @@ const docsBuildInputs = [
   "packages/config-typescript/",
   "packages/config-vitest/",
 ];
+const webBuildInputs = [
+  ".env.example",
+  ".env.development.example",
+  ".env.preview.example",
+  ".env.production.example",
+  ".node-version",
+  "package.json",
+  "pnpm-lock.yaml",
+  "pnpm-workspace.yaml",
+  "turbo.json",
+  "scripts/preview-build.mjs",
+  "scripts/preview-smoke.mjs",
+  "scripts/validate-environment.mjs",
+  "apps/web/",
+  "packages/application/",
+  "packages/auth/",
+  "packages/authorization/",
+  "packages/config-environment/",
+  "packages/config-eslint/",
+  "packages/config-prettier/",
+  "packages/config-typescript/",
+  "packages/config-vitest/",
+  "packages/contracts/",
+  "packages/data-access/",
+  "packages/design-tokens/",
+  "packages/telemetry/",
+];
 
 function gitOutput(args) {
   const result = spawnSync("git", args, {
@@ -56,6 +83,12 @@ export function docsBuildRequired() {
   );
 }
 
+export function webBuildRequired() {
+  return changedPaths().some((path) =>
+    webBuildInputs.some((input) => (input.endsWith("/") ? path.startsWith(input) : path === input)),
+  );
+}
+
 function run(command, args) {
   console.log(`\n> ${command} ${args.join(" ")}`);
   const result = spawnSync(command, args, {
@@ -74,6 +107,7 @@ function run(command, args) {
 
 export function verify({ affected = process.argv.includes("--affected") } = {}) {
   const shouldBuildDocs = !affected || docsBuildRequired();
+  const shouldRunPreviewDelivery = !affected || docsBuildRequired() || webBuildRequired();
 
   const rootCommands = [
     ["pnpm", ["run", "env:check"]],
@@ -108,7 +142,30 @@ export function verify({ affected = process.argv.includes("--affected") } = {}) 
     turboArgs.push("--affected");
   }
 
-  return run("pnpm", turboArgs);
+  const qualityExitCode = run("pnpm", turboArgs);
+
+  if (qualityExitCode !== 0) {
+    return qualityExitCode;
+  }
+
+  if (!shouldRunPreviewDelivery) {
+    console.log("\n> Skipping preview delivery build/smoke because web and docs are unaffected");
+    return 0;
+  }
+
+  for (const args of [
+    ["run", "preview:build:web"],
+    ["run", "preview:build:docs"],
+    ["run", "preview:smoke"],
+  ]) {
+    const exitCode = run("pnpm", args);
+
+    if (exitCode !== 0) {
+      return exitCode;
+    }
+  }
+
+  return 0;
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

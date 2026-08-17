@@ -95,6 +95,9 @@ importers:
       '@personal-finance/authorization':
         specifier: workspace:*
         version: link:../../packages/authorization
+      '@personal-finance/config-environment':
+        specifier: workspace:*
+        version: link:../../packages/config-environment
       '@personal-finance/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
@@ -200,6 +203,21 @@ importers:
         specifier: workspace:*
         version: link:../config-vitest
 
+  packages/config-environment:
+    devDependencies:
+      '@personal-finance/config-eslint':
+        specifier: workspace:*
+        version: link:../config-eslint
+      '@personal-finance/config-prettier':
+        specifier: workspace:*
+        version: link:../config-prettier
+      '@personal-finance/config-typescript':
+        specifier: workspace:*
+        version: link:../config-typescript
+      '@personal-finance/config-vitest':
+        specifier: workspace:*
+        version: link:../config-vitest
+
   packages/config-eslint:
     dependencies:
       '@eslint/js':
@@ -239,6 +257,9 @@ importers:
 
   packages/data-access:
     dependencies:
+      '@personal-finance/config-environment':
+        specifier: workspace:*
+        version: link:../config-environment
       drizzle-orm:
         specifier: 0.45.2
         version: 0.45.2(@types/pg@8.21.0)(pg@8.23.0)
@@ -281,6 +302,21 @@ importers:
         version: link:../config-vitest
 
   packages/generated-api:
+    devDependencies:
+      '@personal-finance/config-eslint':
+        specifier: workspace:*
+        version: link:../config-eslint
+      '@personal-finance/config-prettier':
+        specifier: workspace:*
+        version: link:../config-prettier
+      '@personal-finance/config-typescript':
+        specifier: workspace:*
+        version: link:../config-typescript
+      '@personal-finance/config-vitest':
+        specifier: workspace:*
+        version: link:../config-vitest
+
+  packages/jobs:
     devDependencies:
       '@personal-finance/config-eslint':
         specifier: workspace:*

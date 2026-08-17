@@ -1,5 +1,6 @@
 import "server-only";
 
+import { getScopedEnvironment } from "@personal-finance/config-environment";
 import {
   IdentityDirectory,
   ProviderDouble,
@@ -26,9 +27,11 @@ const identityDirectory = new IdentityDirectory();
 export function isProviderDoubleEnabled(
   environment: Record<string, string | undefined> = process.env,
 ) {
+  const runtimeEnvironment = getScopedEnvironment(environment);
+
   return (
-    environment.AUTH_PROVIDER?.trim().toLowerCase() === "double" &&
-    environment.NODE_ENV === "development"
+    runtimeEnvironment.AUTH_PROVIDER?.trim().toLowerCase() === "double" &&
+    (runtimeEnvironment.NODE_ENV === "development" || runtimeEnvironment.APP_ENV === "preview")
   );
 }
 
@@ -44,13 +47,22 @@ export function createProviderDoubleSessionValue({
     return { reason: "provider-double-disabled", status: "unavailable" };
   }
 
-  const configuration = parseAuthConfiguration(environment);
+  const runtimeEnvironment = getScopedEnvironment(environment);
+
+  if (
+    runtimeEnvironment.AUTH_PROVIDER?.trim().toLowerCase() === "double" &&
+    !isProviderDoubleEnabled(runtimeEnvironment)
+  ) {
+    return { reason: "provider-double-disabled", status: "unavailable" };
+  }
+
+  const configuration = parseAuthConfiguration(runtimeEnvironment);
 
   if (configuration.status === "unavailable") {
     return configuration;
   }
 
-  if (configuration.provider !== "double" || !isProviderDoubleEnabled(environment)) {
+  if (configuration.provider !== "double" || !isProviderDoubleEnabled(runtimeEnvironment)) {
     return { reason: "provider-double-disabled", status: "unavailable" };
   }
 
