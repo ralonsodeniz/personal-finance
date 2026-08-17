@@ -2,6 +2,11 @@
   "name": "@personal-finance/telemetry",
   "version": "0.0.0",
   "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./package.json": "./package.json"
+  },
   "scripts": {
     "placeholder": "node ../../scripts/workspace-placeholder.mjs telemetry",
     "typecheck": "tsc --noEmit --project tsconfig.json",

@@ -21,6 +21,7 @@ const nextConfig: NextConfig = {
     "@personal-finance/contracts",
     "@personal-finance/data-access",
     "@personal-finance/design-tokens",
+    "@personal-finance/telemetry",
   ],
   async rewrites() {
     return [{ destination: "/serwist/sw.js", source: "/sw.js" }];
