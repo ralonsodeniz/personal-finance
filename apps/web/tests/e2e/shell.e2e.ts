@@ -39,6 +39,32 @@ test.describe("production web/PWA shell", () => {
       .toContain(rootScope);
   });
 
+  test("initializes the telemetry runtime on the mounted public shell", async ({ page }) => {
+    await page.goto("/");
+
+    await expect
+      .poll(
+        async () =>
+          page.evaluate(() => ({
+            analyticsProviderFactory:
+              typeof window.__WAYFINDER_TELEMETRY_PROVIDERS__?.createProductAnalyticsProvider,
+            operationalSinkCount:
+              window.__WAYFINDER_TELEMETRY_PROVIDERS__?.operationalSinks?.length,
+            postHogCapture: typeof window.__WAYFINDER_TELEMETRY_RUNTIME__?.postHog?.capture,
+            runtime: Boolean(window.__WAYFINDER_TELEMETRY_RUNTIME__),
+            runtimeMarker: document.documentElement.dataset.wayfinderTelemetryRuntime,
+          })),
+        { timeout: 10_000 },
+      )
+      .toEqual({
+        analyticsProviderFactory: "function",
+        operationalSinkCount: 2,
+        postHogCapture: "function",
+        runtime: true,
+        runtimeMarker: "initialized",
+      });
+  });
+
   test("serves an installability manifest and its icon", async ({ request }) => {
     const manifestResponse = await request.get("/manifest.webmanifest");
 

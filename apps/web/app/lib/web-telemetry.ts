@@ -292,6 +292,11 @@ export function initializeWebShellTelemetryProviders({
 
   window.__WAYFINDER_TELEMETRY_PROVIDERS__ = providers;
 
+  if (typeof document !== "undefined") {
+    // Keep the client-owned boundary observable to browser smoke tests without exposing config.
+    document.documentElement.dataset.wayfinderTelemetryRuntime = "initialized";
+  }
+
   return providers;
 }
 
