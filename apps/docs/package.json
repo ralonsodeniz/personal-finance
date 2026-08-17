@@ -6,6 +6,7 @@
     "placeholder": "node ../../scripts/workspace-placeholder.mjs docs",
     "start": "docusaurus start",
     "build": "docusaurus build",
+    "build:preview": "node ../../scripts/preview-build.mjs docs",
     "serve": "docusaurus serve --no-open",
     "typecheck": "tsc --noEmit --project tsconfig.json",
     "lint": "node ../../scripts/workspace-lint.mjs",

@@ -1,3 +1,4 @@
+import { getScopedEnvironment } from "@personal-finance/config-environment";
 import {
   PRODUCT_ANALYTICS_REPLAY_ENABLED,
   createOperationalTelemetry,
@@ -84,9 +85,19 @@ export interface WebShellTelemetry {
 }
 
 function defaultEnvironment(): PostHogEnvironment {
+  const environment = getScopedEnvironment(process.env);
+
+  if (
+    environment.APP_ENV === "preview" &&
+    (environment.TELEMETRY_MODE?.trim().toLowerCase() !== "configured" ||
+      environment.TELEMETRY_APPROVED?.trim().toLowerCase() !== "true")
+  ) {
+    return {};
+  }
+
   return {
-    NEXT_PUBLIC_POSTHOG_HOST: process.env.NEXT_PUBLIC_POSTHOG_HOST,
-    NEXT_PUBLIC_POSTHOG_KEY: process.env.NEXT_PUBLIC_POSTHOG_KEY,
+    NEXT_PUBLIC_POSTHOG_HOST: environment.NEXT_PUBLIC_POSTHOG_HOST,
+    NEXT_PUBLIC_POSTHOG_KEY: environment.NEXT_PUBLIC_POSTHOG_KEY,
   };
 }
 

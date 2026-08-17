@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev --turbopack",
     "build": "next build --turbopack",
+    "build:preview": "node ../../scripts/preview-build.mjs web",
     "start": "next start",
     "placeholder": "node ../../scripts/workspace-placeholder.mjs web",
     "typecheck": "next typegen && tsc --noEmit --project tsconfig.json && tsc --noEmit --project service-worker/tsconfig.json",
@@ -12,12 +13,14 @@
     "format:check": "prettier --check .",
     "test": "vitest run --config ../../vitest.config.mjs --passWithNoTests",
     "test:e2e": "playwright test",
-    "test:e2e:auth": "playwright test --config=playwright.dev.config.ts"
+    "test:e2e:auth": "playwright test --config=playwright.dev.config.ts",
+    "test:e2e:preview": "playwright test --config=playwright.preview.config.ts"
   },
   "dependencies": {
     "@personal-finance/application": "workspace:*",
     "@personal-finance/auth": "workspace:*",
     "@personal-finance/authorization": "workspace:*",
+    "@personal-finance/config-environment": "workspace:*",
     "@personal-finance/contracts": "workspace:*",
     "@personal-finance/data-access": "workspace:*",
     "@personal-finance/design-tokens": "workspace:*",

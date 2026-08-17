@@ -5,7 +5,13 @@ import { dirname, resolve } from "node:path";
 
 const scriptDirectory = dirname(fileURLToPath(import.meta.url));
 const defaultRootDirectory = resolve(scriptDirectory, "..");
-const allowedEnvironmentFiles = new Set([".env.example", ".env.template"]);
+const allowedEnvironmentFiles = new Set([
+  ".env.development.example",
+  ".env.example",
+  ".env.preview.example",
+  ".env.production.example",
+  ".env.template",
+]);
 const forbiddenPathPattern =
   /(?:^|\/)(?:\.env(?:\.[^/]+)?|\.secrets|secrets)(?:\/|$)|\.(?:pem|key|p12|pfx)$/i;
 const secretPatterns = [

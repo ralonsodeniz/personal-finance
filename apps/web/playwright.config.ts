@@ -18,8 +18,11 @@ export default defineConfig({
     command: `pnpm build && pnpm start --hostname 127.0.0.1 --port ${port}`,
     env: {
       ...process.env,
-      AUTH0_SECRET: "test-only-local-session-secret-not-a-credential",
-      AUTH_PROVIDER: "double",
+      APP_ENV: "preview",
+      VERCEL_ENV: "preview",
+      WAYFINDER_PREVIEW_AUTH0_SECRET: "test-only-local-session-secret-not-a-credential",
+      WAYFINDER_PREVIEW_AUTH_PROVIDER: "double",
+      WAYFINDER_PREVIEW_DATA_MODE: "provider-double",
     },
     reuseExistingServer: process.env.PLAYWRIGHT_REUSE_SERVER === "true",
     timeout: 120_000,

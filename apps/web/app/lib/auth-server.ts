@@ -2,6 +2,7 @@ import "server-only";
 
 import { cookies } from "next/headers";
 
+import { getScopedEnvironment } from "@personal-finance/config-environment";
 import {
   parseAuthConfiguration,
   type AuthConfiguration,
@@ -31,7 +32,7 @@ export type WebAuthConfiguration =
   | { reason: AuthConfigurationReason; status: "unavailable" };
 
 function readServerAuthConfiguration(): AuthConfiguration {
-  return parseAuthConfiguration(process.env);
+  return parseAuthConfiguration(getScopedEnvironment(process.env));
 }
 
 export async function getWebAuthState(): Promise<WebAuthState> {
