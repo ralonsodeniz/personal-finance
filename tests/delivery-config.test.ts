@@ -69,5 +69,6 @@ describe("preview delivery contract", () => {
     expect(workflow).toContain("pnpm run verify");
     expect(workflow).toContain("pnpm run verify:affected");
     expect(workflow).toContain("fetch-depth: 0");
+    expect(workflow).toContain("push:\n    branches:\n      - main");
   });
 });

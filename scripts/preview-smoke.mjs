@@ -19,6 +19,7 @@ const previewEnvironment = {
 function start(command, args) {
   const child = spawn(command, args, {
     cwd: rootDirectory,
+    detached: process.platform !== "win32",
     env: previewEnvironment,
     stdio: "inherit",
   });
@@ -28,6 +29,50 @@ function start(command, args) {
   });
 
   return child;
+}
+
+function sendSignal(child, signal) {
+  if (child.exitCode !== null || child.signalCode !== null) {
+    return;
+  }
+
+  try {
+    if (process.platform === "win32" || !child.pid) {
+      child.kill(signal);
+    } else {
+      process.kill(-child.pid, signal);
+    }
+  } catch (error) {
+    if (error?.code !== "ESRCH") {
+      throw error;
+    }
+  }
+}
+
+function stop(child) {
+  if (child.exitCode !== null || child.signalCode !== null) {
+    return Promise.resolve();
+  }
+
+  return new Promise((resolvePromise, reject) => {
+    const finish = () => {
+      clearTimeout(forceKillTimer);
+      resolvePromise();
+    };
+
+    child.once("error", reject);
+    child.once("exit", finish);
+    sendSignal(child, "SIGTERM");
+
+    const forceKillTimer = setTimeout(() => {
+      try {
+        sendSignal(child, "SIGKILL");
+      } catch (error) {
+        reject(error);
+      }
+    }, 5_000);
+    forceKillTimer.unref();
+  });
 }
 
 async function waitForURL(url, child) {
@@ -98,6 +143,5 @@ try {
   console.error(error instanceof Error ? error.message : error);
   process.exitCode = 1;
 } finally {
-  web.kill("SIGTERM");
-  docs.kill("SIGTERM");
+  await Promise.all([stop(web), stop(docs)]);
 }
