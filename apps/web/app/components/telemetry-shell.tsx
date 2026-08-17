@@ -2,11 +2,16 @@
 
 import { useEffect } from "react";
 
-import { createWebShellTelemetry, getWebShellTelemetryProviders } from "../lib/web-telemetry";
+import {
+  createWebShellTelemetry,
+  initializeWebShellTelemetryProviders,
+} from "../lib/web-telemetry";
 
 export function TelemetryShell() {
   useEffect(() => {
-    createWebShellTelemetry({ providers: getWebShellTelemetryProviders() }).shellViewed();
+    createWebShellTelemetry({
+      providers: initializeWebShellTelemetryProviders(),
+    }).shellViewed();
   }, []);
 
   return null;

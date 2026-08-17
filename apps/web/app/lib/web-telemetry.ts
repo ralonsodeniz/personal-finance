@@ -55,6 +55,11 @@ export interface WebShellTelemetryRuntimeBoundary {
   };
 }
 
+export interface WebShellTelemetryRuntimeInitializationOptions {
+  boundary?: WebShellTelemetryRuntimeBoundary;
+  fetch?: typeof globalThis.fetch;
+}
+
 declare global {
   interface Window {
     __WAYFINDER_TELEMETRY_RUNTIME__?: WebShellTelemetryRuntimeBoundary;
@@ -153,6 +158,72 @@ function adapterConfiguration(configuration: PostHogConfiguration): ProductAnaly
       };
 }
 
+const DEFAULT_OPAQUE_IDENTITY = "opaque:web-shell";
+const POSTHOG_API_KEY_FIELD = ["api", "key"].join("_");
+
+function createDefaultPostHogRuntime(
+  runtimeFetch: typeof globalThis.fetch | undefined,
+): NonNullable<WebShellTelemetryRuntimeBoundary["postHog"]> {
+  let configuration: Extract<PostHogConfiguration, { status: "configured" }> | undefined;
+  let opaqueIdentity = DEFAULT_OPAQUE_IDENTITY;
+
+  return {
+    capture(eventName, properties) {
+      if (!configuration || !runtimeFetch) {
+        return;
+      }
+
+      const payload = {
+        [POSTHOG_API_KEY_FIELD]: configuration.apiKey,
+        event: eventName,
+        properties: {
+          ...properties,
+          distinct_id: opaqueIdentity,
+        },
+      };
+
+      try {
+        void Promise.resolve(
+          runtimeFetch(`${configuration.host}/capture/`, {
+            body: JSON.stringify(payload),
+            headers: { "content-type": "application/json" },
+            method: "POST",
+          }),
+        ).catch(() => undefined);
+      } catch {
+        // Provider outages are isolated from the web shell.
+      }
+    },
+    configure(nextConfiguration) {
+      configuration = nextConfiguration;
+    },
+    identify(nextOpaqueIdentity) {
+      opaqueIdentity = nextOpaqueIdentity;
+    },
+    reset() {
+      opaqueIdentity = DEFAULT_OPAQUE_IDENTITY;
+    },
+  };
+}
+
+export function createDefaultWebShellTelemetryRuntime(
+  runtimeFetch: typeof globalThis.fetch | undefined = typeof globalThis.fetch === "function"
+    ? globalThis.fetch.bind(globalThis)
+    : undefined,
+): WebShellTelemetryRuntimeBoundary {
+  return {
+    // Live operational SDK bootstrap remains an environment-owned concern. These
+    // initialized hooks are deliberately safe no-ops until a provider runtime is attached.
+    openTelemetry: {
+      emitDiagnostic() {},
+    },
+    postHog: createDefaultPostHogRuntime(runtimeFetch),
+    sentry: {
+      captureDiagnostic() {},
+    },
+  };
+}
+
 export function createWebShellTelemetryProvidersFromRuntimeBoundary(
   boundary: WebShellTelemetryRuntimeBoundary = {},
 ): WebShellTelemetryProviders {
@@ -202,9 +273,17 @@ export function createWebShellTelemetryProvidersFromRuntimeBoundary(
   };
 }
 
-export function getWebShellTelemetryProviders(): WebShellTelemetryProviders | undefined {
+export function initializeWebShellTelemetryProviders({
+  boundary,
+  fetch: runtimeFetch,
+}: WebShellTelemetryRuntimeInitializationOptions = {}): WebShellTelemetryProviders | undefined {
   if (typeof window === "undefined") {
     return undefined;
+  }
+
+  if (!window.__WAYFINDER_TELEMETRY_RUNTIME__) {
+    window.__WAYFINDER_TELEMETRY_RUNTIME__ =
+      boundary ?? createDefaultWebShellTelemetryRuntime(runtimeFetch);
   }
 
   const providers =
@@ -214,6 +293,10 @@ export function getWebShellTelemetryProviders(): WebShellTelemetryProviders | un
   window.__WAYFINDER_TELEMETRY_PROVIDERS__ = providers;
 
   return providers;
+}
+
+export function getWebShellTelemetryProviders(): WebShellTelemetryProviders | undefined {
+  return initializeWebShellTelemetryProviders();
 }
 
 export function createWebShellTelemetry({

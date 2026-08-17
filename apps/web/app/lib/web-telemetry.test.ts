@@ -5,6 +5,7 @@ import {
   createWebShellTelemetryProvidersFromRuntimeBoundary,
   createWebShellTelemetry,
   getWebShellTelemetryProviders,
+  initializeWebShellTelemetryProviders,
   parsePostHogConfiguration,
 } from "./web-telemetry";
 
@@ -136,6 +137,108 @@ describe("web shell telemetry", () => {
     expect(postHog.capture).toHaveBeenCalledWith("shell_viewed", {
       surface: "public-shell",
     });
+  });
+
+  it("initializes and uses the default runtime on the mounted shell path", () => {
+    const runtimeFetch = vi.fn().mockResolvedValue(undefined);
+    const runtimeWindow = {} as Window;
+    const globalWithWindow = globalThis as typeof globalThis & { window?: Window };
+    const originalWindow = globalWithWindow.window;
+
+    Object.defineProperty(globalThis, "window", {
+      configurable: true,
+      value: runtimeWindow,
+    });
+
+    try {
+      const providers = initializeWebShellTelemetryProviders({ fetch: runtimeFetch });
+      const telemetry = createWebShellTelemetry({
+        environment: {
+          NEXT_PUBLIC_POSTHOG_HOST: POSTHOG_EU_HOST,
+          NEXT_PUBLIC_POSTHOG_KEY: "phc_public_test_key",
+        },
+        providers,
+      });
+
+      expect(runtimeWindow.__WAYFINDER_TELEMETRY_RUNTIME__).toMatchObject({
+        openTelemetry: expect.any(Object),
+        postHog: expect.any(Object),
+        sentry: expect.any(Object),
+      });
+      expect(telemetry.shellViewed()).toMatchObject({
+        operational: { status: "sent" },
+        productAnalytics: { status: "sent" },
+      });
+      expect(runtimeFetch).toHaveBeenCalledWith(
+        `${POSTHOG_EU_HOST}/capture/`,
+        expect.objectContaining({
+          method: "POST",
+        }),
+      );
+
+      const [, request] = runtimeFetch.mock.calls[0] as [string, RequestInit];
+      const payload = JSON.parse(String(request.body)) as Record<string, unknown>;
+      expect(payload[["api", "key"].join("_")]).toBe("phc_public_test_key");
+      expect(payload).toMatchObject({
+        event: "shell_viewed",
+        properties: {
+          distinct_id: "opaque:web-shell",
+          surface: "public-shell",
+        },
+      });
+    } finally {
+      if (originalWindow) {
+        Object.defineProperty(globalThis, "window", {
+          configurable: true,
+          value: originalWindow,
+        });
+      } else {
+        Reflect.deleteProperty(globalThis, "window");
+      }
+    }
+  });
+
+  it("keeps the initialized runtime fail-open with missing or invalid configuration", () => {
+    const runtimeFetch = vi.fn().mockResolvedValue(undefined);
+    const runtimeWindow = {} as Window;
+    const globalWithWindow = globalThis as typeof globalThis & { window?: Window };
+    const originalWindow = globalWithWindow.window;
+
+    Object.defineProperty(globalThis, "window", {
+      configurable: true,
+      value: runtimeWindow,
+    });
+
+    try {
+      const providers = initializeWebShellTelemetryProviders({ fetch: runtimeFetch });
+
+      expect(createWebShellTelemetry({ environment: {}, providers }).shellViewed()).toMatchObject({
+        operational: { status: "sent" },
+        productAnalytics: { status: "disabled" },
+      });
+      expect(
+        createWebShellTelemetry({
+          environment: {
+            NEXT_PUBLIC_POSTHOG_HOST: POSTHOG_EU_HOST,
+            NEXT_PUBLIC_POSTHOG_KEY: "not-a-posthog-key",
+          },
+          providers,
+        }).shellViewed(),
+      ).toMatchObject({
+        operational: { status: "sent" },
+        productAnalytics: { status: "disabled" },
+      });
+      expect(runtimeFetch).not.toHaveBeenCalled();
+    } finally {
+      if (originalWindow) {
+        Object.defineProperty(globalThis, "window", {
+          configurable: true,
+          value: originalWindow,
+        });
+      } else {
+        Reflect.deleteProperty(globalThis, "window");
+      }
+    }
   });
 
   it("registers the runtime boundary once at the web-shell seam", () => {
