@@ -37,7 +37,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Install Playwright Chromium
-        run: pnpm --filter @personal-finance/web exec playwright install --with-deps chromium
+        run: pnpm --filter @personal-finance/web exec playwright install chromium
 
       - name: Run the full root and preview delivery verification flow
         run: pnpm run verify
