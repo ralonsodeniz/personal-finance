@@ -21,6 +21,7 @@
     "@personal-finance/contracts": "workspace:*",
     "@personal-finance/data-access": "workspace:*",
     "@personal-finance/design-tokens": "workspace:*",
+    "@personal-finance/telemetry": "workspace:*",
     "@serwist/turbopack": "9.5.12",
     "next": "16.3.0",
     "react": "19.2.8",

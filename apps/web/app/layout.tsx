@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import "@personal-finance/design-tokens/tokens.css";
 import "./globals.css";
 
+import { TelemetryShell } from "./components/telemetry-shell";
 import { pwaConfig } from "./lib/pwa";
 
 export const metadata: Metadata = {
@@ -30,6 +31,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
       <body>
+        <TelemetryShell />
         <SerwistProvider
           cacheOnNavigation={pwaConfig.cacheOnNavigation}
           disable={pwaConfig.disable}
