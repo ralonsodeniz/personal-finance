@@ -25,8 +25,14 @@ A change to `main` is eligible only when all of these conditions hold:
    is empty and rejects explicit user/team restriction arrays.
 7. Force-pushes and deletion of `main` remain disabled.
 
-The policy also dismisses stale human approvals after new commits and enables
-latest-push approval for the future multi-maintainer case. `require_code_owner_reviews`
+The policy dismisses stale human approvals after new commits. Latest-push
+approval is disabled while normal human approvals remain at zero: GitHub
+enforces `require_last_push_approval` through a review record, and the Owner
+approval mechanism is a status check rather than a GitHub review. Enabling it
+now would block the sole-maintainer path even after the Owner check succeeds.
+When a second human maintainer and a non-zero human-approval requirement are
+introduced, enable latest-push approval in the same protection update and
+verify an independent approval of the newest head. `require_code_owner_reviews`
 is false because no CODEOWNERS policy is in scope and the owner check is not a
 substitute for a future independent human reviewer.
 
@@ -48,6 +54,11 @@ After any new commit is pushed to a pull-request branch:
 4. Confirm that `Owner approval` is successful for the new head SHA and that
    the Root quality gate, CodeQL analysis, and dependency review contexts are
    also successful.
+
+When normal human approvals are later enabled, update the protection rule to
+set `require_last_push_approval: true` and obtain an independent approval for
+the newest head before treating the pull request as eligible. Do not use the
+Owner status check as that review record.
 
 Editing the approval comment away from the exact command or deleting it
 invalidates authorization. A new exact comment is required. The workflow
@@ -85,7 +96,7 @@ required_status_checks.contexts:
   - CodeQL / CodeQL analysis
   - Dependency review / Dependency review
 required_pull_request_reviews.dismiss_stale_reviews: true
-required_pull_request_reviews.require_last_push_approval: true
+required_pull_request_reviews.require_last_push_approval: false
 required_pull_request_reviews.required_approving_review_count: 0
 required_pull_request_reviews.require_code_owner_reviews: false
 enforce_admins.enabled: true
@@ -126,7 +137,9 @@ The Owner approval event fixture tests cover the complementary non-live
 demonstration: missing, stale, edited, deleted, wrong-actor, prose, bot, and
 non-`main` approvals fail, while the exact canonical-owner command succeeds for
 the current head. A current valid approval plus all four passing required
-contexts requires an open representative pull request after this rule is in
-place. Creating that PR is intentionally deferred because the delegated issue
-#42 implementation must stop before PR lifecycle operations; the orchestrator
-must authorize that follow-up separately.
+contexts is demonstrated by the authorized PR lifecycle for PR #46: before
+approval, the Owner check was non-successful and the PR was blocked; after the
+exact owner command, the current-head Owner check and all other required
+contexts passed. With latest-push approval deferred for the solo-maintainer
+phase, GitHub can evaluate that policy as merge-eligible without a normal human
+review record.

@@ -105,8 +105,8 @@ function verifyProtection() {
   );
   assert(reviews?.dismiss_stale_reviews === true, "main must dismiss stale human approvals.");
   assert(
-    reviews?.require_last_push_approval === true,
-    "main must require approval of the latest push in future multi-maintainer mode.",
+    reviews?.require_last_push_approval === false,
+    "main must defer latest-push approval until human approvals are enabled.",
   );
   assert(
     reviews?.required_approving_review_count === 0,
