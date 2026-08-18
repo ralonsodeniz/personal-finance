@@ -3,10 +3,10 @@ import { spawnSync } from "node:child_process";
 const repository = "ralonsodeniz/personal-finance";
 const defaultBranch = "main";
 const requiredContexts = [
-  "Quality / Root quality gate",
+  "Root quality gate",
   "Owner approval",
-  "CodeQL / CodeQL analysis",
-  "Dependency review / Dependency review",
+  "CodeQL analysis",
+  "Dependency review",
 ];
 
 function run(command, args) {
@@ -53,6 +53,11 @@ function assertEqual(actual, expected, message) {
   );
 }
 
+function assertSameItems(actual, expected, message) {
+  assert(Array.isArray(actual), `${message}: expected an array`);
+  assertEqual([...actual].sort(), [...expected].sort(), message);
+}
+
 function emptyBypassAllowances(value) {
   if (value === undefined) {
     return true;
@@ -93,8 +98,8 @@ function verifyProtection() {
     "main must require pull requests.",
   );
   assert(statusChecks?.strict === true, "main must require a strictly up-to-date branch.");
-  assertEqual(statusChecks.contexts, requiredContexts, "main required-check contexts changed");
-  assertEqual(
+  assertSameItems(statusChecks.contexts, requiredContexts, "main required-check contexts changed");
+  assertSameItems(
     statusChecks.checks?.map(({ context }) => context),
     requiredContexts,
     "main structured required-check contexts changed",

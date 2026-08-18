@@ -14,8 +14,9 @@ A change to `main` is eligible only when all of these conditions hold:
    are not a merge path.
 2. The pull-request head is up to date with `main`.
 3. These four stable check contexts are successful for the current head:
-   `Quality / Root quality gate`, `Owner approval`, `CodeQL / CodeQL analysis`,
-   and `Dependency review / Dependency review`.
+   `Root quality gate`, `Owner approval`, `CodeQL analysis`, and
+   `Dependency review`. These are the check-run names exposed by GitHub; the
+   workflow names are metadata and are not part of the required context.
 4. Every review conversation is resolved.
 5. The pull request has zero required normal human approvals for the current
    solo-maintainer phase. The separate `Owner approval` check is the explicit
@@ -91,10 +92,10 @@ main: protected
 rulesets applying to main (including inherited): []
 required_status_checks.strict: true
 required_status_checks.contexts:
-  - Quality / Root quality gate
+  - Root quality gate
   - Owner approval
-  - CodeQL / CodeQL analysis
-  - Dependency review / Dependency review
+  - CodeQL analysis
+  - Dependency review
 required_pull_request_reviews.dismiss_stale_reviews: true
 required_pull_request_reviews.require_last_push_approval: false
 required_pull_request_reviews.required_approving_review_count: 0

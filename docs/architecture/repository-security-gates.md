@@ -6,15 +6,16 @@ dependencies or executes application code from a pull request.
 
 ## Stable check contexts
 
-The workflow and job names are intentionally explicit so the resulting check
-contexts can be required later when the `main` protection rule is configured:
+The workflow and job names are intentionally explicit. GitHub exposes the job
+name as the stable required check context; the workflow name is metadata and
+must not be prefixed to the context when configuring `main` protection:
 
-| Gate              | Workflow name       | Job name            | Expected check context                  |
-| ----------------- | ------------------- | ------------------- | --------------------------------------- |
-| CodeQL            | `CodeQL`            | `CodeQL analysis`   | `CodeQL / CodeQL analysis`              |
-| Dependency review | `Dependency review` | `Dependency review` | `Dependency review / Dependency review` |
+| Gate              | Workflow name       | Job name            | Expected check context |
+| ----------------- | ------------------- | ------------------- | ---------------------- |
+| CodeQL            | `CodeQL`            | `CodeQL analysis`   | `CodeQL analysis`      |
+| Dependency review | `Dependency review` | `Dependency review` | `Dependency review`    |
 
-The existing quality check remains `Quality / Root quality gate`.
+The existing quality check remains `Root quality gate`.
 
 ## Trigger and threshold policy
 
