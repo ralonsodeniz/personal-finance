@@ -1,0 +1,30 @@
+name: Dependency review
+
+on:
+  pull_request:
+    branches:
+      - main
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dependency-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    name: Dependency review
+    runs-on: ubuntu-latest
+    steps:
+      - name: Review dependency changes
+        uses: actions/dependency-review-action@v4
+        with:
+          # "high" rejects high and critical findings; lower severities remain
+          # visible without blocking the pull request.
+          fail-on-severity: high
