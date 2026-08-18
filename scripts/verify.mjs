@@ -112,6 +112,7 @@ export function verify({ affected = process.argv.includes("--affected") } = {}) 
   const rootCommands = [
     ["pnpm", ["run", "env:check"]],
     ["pnpm", ["run", "secrets:check"]],
+    ["pnpm", ["run", "security:check"]],
     ...(shouldBuildDocs ? [["pnpm", ["run", "docs:build"]]] : []),
     ...(affected ? [] : qualityTasks.map((task) => ["pnpm", ["run", task]])),
   ];

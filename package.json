@@ -21,6 +21,7 @@
     "test": "vitest run",
     "env:check": "node scripts/validate-environment.mjs",
     "secrets:check": "node scripts/check-secret-safety.mjs",
+    "security:check": "node scripts/validate-security-workflows.mjs",
     "verify": "node scripts/verify.mjs",
     "verify:affected": "node scripts/verify.mjs --affected"
   },
