@@ -1,8 +1,8 @@
 # Owner approval status gate
 
-The `Owner approval` check is the repository owner's release authorization for
-pull requests targeting `main`. It is separate from code review, security
-analysis, and the Root quality gate.
+The `Owner approval` check is the repository owner's release authorization, not
+code review. It is separate from security analysis, the Root quality gate, and
+any future normal human review for pull requests targeting `main`.
 
 ## Usage
 
@@ -15,9 +15,11 @@ must add a comment whose complete body is exactly:
 
 Leading or trailing whitespace, prose containing the command, a different
 command, a bot comment, or a comment from any other identity is not accepted.
-The workflow authenticates the owner by the configured login `ralonsodeniz` or
-immutable GitHub user ID `28633982`; the immutable ID keeps authorization
-working if the owner changes their username.
+The workflow authenticates the owner by immutable GitHub user ID `28633982`.
+The configured login `ralonsodeniz` remains documentary/diagnostic only and is
+never an authorization fallback: a login-only comment or a comment with a
+different user ID cannot authorize. A username change for the same immutable
+user ID remains valid.
 
 The stable status-check name is `Owner approval`. It is successful only when
 the current open pull request targets `main` and the current head SHA has an
@@ -29,6 +31,42 @@ approval removes authorization. Other comment changes recompute the state and
 preserve a successful current-SHA authorization only while the exact approval
 with the same recorded comment ID still exists; deleting a newer approval
 cannot fall back to an older comment.
+
+The workflow accepts an existing check run as managed only when the REST
+payload has the expected name, current head SHA, completed `success` or
+`failure` conclusion, managed output marker, and the trusted GitHub Actions
+publisher identity: app ID `15368`, slug `github-actions`, and name `GitHub
+Actions`. A foreign or malformed check run is ignored and cannot authorize or
+be updated as the managed Owner approval result.
+
+The workflow's internal job is named `Recompute current approval state`. It is
+a supporting, non-required implementation check; it is not an additional merge
+authority. The required merge context remains exactly `Owner approval`.
+
+## Operator merge sequence
+
+For a pull request targeting `main`, use this order:
+
+1. Review the current pull-request diff and confirm the target is `main`.
+2. Wait for every non-Owner required context to pass for the current head:
+   `Root quality gate`, `CodeQL analysis`, and `Dependency review`.
+3. Re-fetch the check state and verify the exact required-context set is
+   `Root quality gate`, `Owner approval`, `CodeQL analysis`, and
+   `Dependency review`. Confirm that `Owner approval` is the only remaining
+   blocker; do not count the supporting `Recompute current approval state`
+   job as a second required context.
+4. Post a new comment whose complete body is exactly `/owner-approve`.
+5. Re-fetch the current head SHA, approval comment, check runs, and pull-request
+   merge state. Do not rely on a cached check result or an older head.
+6. Merge only when all four required contexts pass for the current head and
+   GitHub reports `mergeStateStatus: CLEAN` (the clean merge state).
+
+For example, the final read-only state check is:
+
+```bash
+gh pr checks <number>
+gh pr view <number> --json headRefOid,baseRefName,state,statusCheckRollup,mergeStateStatus
+```
 
 ## Security boundary
 
@@ -57,7 +95,7 @@ authenticated `gh` commands:
 ```bash
 gh pr checks <number>
 gh api repos/ralonsodeniz/personal-finance/commits/<head-sha>/check-runs \
-  --jq '.check_runs[] | select(.name == "Owner approval") | {head_sha, conclusion, output}'
+  --jq '.check_runs[] | select(.name == "Owner approval") | {head_sha, conclusion, output, app: {id, slug, name}}'
 ```
 
 Never use a real credential or pull-request code as a test fixture.

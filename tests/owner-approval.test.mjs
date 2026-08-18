@@ -9,6 +9,9 @@ import {
   OWNER_APPROVAL_CHECK_NAME,
   OWNER_ID,
   OWNER_LOGIN,
+  TRUSTED_GITHUB_ACTIONS_APP_ID,
+  TRUSTED_GITHUB_ACTIONS_APP_NAME,
+  TRUSTED_GITHUB_ACTIONS_APP_SLUG,
   buildOwnerApprovalCheckPayload,
   evaluateOwnerApproval,
   getManagedApprovalCommentId,
@@ -25,6 +28,15 @@ const workflowPath = fileURLToPath(
 const documentationPath = fileURLToPath(
   new URL("../docs/agents/owner-approval.md", import.meta.url),
 );
+const protectionDocumentationPath = fileURLToPath(
+  new URL("../docs/architecture/main-protection.md", import.meta.url),
+);
+
+const trustedGitHubActionsApp = {
+  id: TRUSTED_GITHUB_ACTIONS_APP_ID,
+  name: TRUSTED_GITHUB_ACTIONS_APP_NAME,
+  slug: TRUSTED_GITHUB_ACTIONS_APP_SLUG,
+};
 
 function ownerComment(overrides = {}) {
   return {
@@ -50,9 +62,11 @@ function grantedCheck(headSha = currentHeadSha, approvalCommentId = "101") {
     conclusion: "success",
     head_sha: headSha,
     name: OWNER_APPROVAL_CHECK_NAME,
+    app: trustedGitHubActionsApp,
     output: {
       text: `${MANAGED_CHECK_MARKER}\nCurrent head SHA: ${headSha}\n${APPROVAL_COMMENT_MARKER} ${approvalCommentId}`,
     },
+    status: "completed",
   };
 }
 
@@ -74,7 +88,10 @@ describe("owner approval policy", () => {
       isExactOwnerApprovalComment(
         ownerComment({ user: { id: OWNER_ID + 1, login: OWNER_LOGIN, type: "User" } }),
       ),
-    ).toBe(true);
+    ).toBe(false);
+    expect(
+      isExactOwnerApprovalComment(ownerComment({ user: { login: OWNER_LOGIN, type: "User" } })),
+    ).toBe(false);
     expect(
       isExactOwnerApprovalComment(
         ownerComment({ user: { id: OWNER_ID, login: "renamed-owner", type: "User" } }),
@@ -221,7 +238,7 @@ describe("owner approval policy", () => {
     ).toBe("failure");
   });
 
-  it("recognizes only its managed current-head check run", () => {
+  it("recognizes only its managed current-head check run from GitHub Actions", () => {
     expect(isManagedOwnerApprovalCheckRun(grantedCheck(), currentHeadSha)).toBe(true);
     expect(getManagedApprovalCommentId(grantedCheck(), currentHeadSha)).toBe("101");
     expect(isManagedOwnerApprovalCheckRun(grantedCheck(previousHeadSha), currentHeadSha)).toBe(
@@ -233,6 +250,63 @@ describe("owner approval policy", () => {
         currentHeadSha,
       ),
     ).toBe(false);
+    expect(
+      isManagedOwnerApprovalCheckRun(
+        {
+          ...grantedCheck(),
+          app: { ...trustedGitHubActionsApp, id: TRUSTED_GITHUB_ACTIONS_APP_ID + 1 },
+        },
+        currentHeadSha,
+      ),
+    ).toBe(false);
+    expect(
+      isManagedOwnerApprovalCheckRun(
+        { ...grantedCheck(), app: { ...trustedGitHubActionsApp, slug: "foreign-actions" } },
+        currentHeadSha,
+      ),
+    ).toBe(false);
+    expect(
+      isManagedOwnerApprovalCheckRun(
+        { ...grantedCheck(), app: { ...trustedGitHubActionsApp, name: "Foreign Actions" } },
+        currentHeadSha,
+      ),
+    ).toBe(false);
+    expect(
+      isManagedOwnerApprovalCheckRun(
+        { ...grantedCheck(), app: { id: TRUSTED_GITHUB_ACTIONS_APP_ID } },
+        currentHeadSha,
+      ),
+    ).toBe(false);
+    expect(
+      isManagedOwnerApprovalCheckRun({ ...grantedCheck(), app: undefined }, currentHeadSha),
+    ).toBe(false);
+    expect(
+      isManagedOwnerApprovalCheckRun(
+        {
+          ...grantedCheck(),
+          output: { text: `${MANAGED_CHECK_MARKER}\nCurrent head SHA: ${currentHeadSha}` },
+        },
+        currentHeadSha,
+      ),
+    ).toBe(false);
+    expect(
+      isManagedOwnerApprovalCheckRun({ ...grantedCheck(), conclusion: "neutral" }, currentHeadSha),
+    ).toBe(false);
+  });
+
+  it("fails closed when a foreign managed-looking check run is the only authorization", () => {
+    const foreignCheck = {
+      ...grantedCheck(),
+      app: { ...trustedGitHubActionsApp, id: TRUSTED_GITHUB_ACTIONS_APP_ID + 1 },
+    };
+
+    expect(
+      evaluateOwnerApproval({
+        checkRuns: [foreignCheck],
+        comments: [ownerComment()],
+        pullRequest: pullRequest(),
+      }).conclusion,
+    ).toBe("failure");
   });
 
   it("builds the stable check payload against the current head SHA", () => {
@@ -277,6 +351,8 @@ describe("owner approval policy", () => {
     expect(workflow).toContain("ref: main");
     expect(workflow).toContain("persist-credentials: false");
     expect(workflow).toContain("run: node scripts/owner-approval.mjs");
+    expect(workflow).toContain("name: Recompute current approval state");
+    expect(workflow).not.toContain("name: Recompute owner approval");
     expect(workflow).not.toContain("pull_request:\n");
     expect(workflow).not.toContain("github.event.pull_request.head.sha");
     expect(workflow).not.toContain("pnpm install");
@@ -291,5 +367,14 @@ describe("owner approval policy", () => {
     expect(documentation).toContain("28633982");
     expect(documentation).toContain("current head SHA");
     expect(documentation).toContain("pull_request_target");
+    expect(documentation).toMatch(/release authorization, not\s+code review/);
+    expect(documentation).toMatch(/GitHub Actions\s+publisher identity: app ID `15368`/);
+    expect(documentation).toContain("Recompute current approval state");
+    expect(documentation).toContain("mergeState");
+
+    const protectionDocumentation = readFileSync(protectionDocumentationPath, "utf8");
+    expect(protectionDocumentation).toContain("all non-Owner required contexts");
+    expect(protectionDocumentation).toContain("only remaining blocker");
+    expect(protectionDocumentation).toContain("mergeState is clean");
   });
 });
