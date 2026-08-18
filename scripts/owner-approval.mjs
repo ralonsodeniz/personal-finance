@@ -10,12 +10,15 @@ export const APPROVAL_COMMENT_MARKER = "Approval comment ID:";
 export const OWNER_LOGIN = "ralonsodeniz";
 export const OWNER_ID = 28633982;
 export const TARGET_BRANCH = "main";
+export const TRUSTED_GITHUB_ACTIONS_APP_ID = 15368;
+export const TRUSTED_GITHUB_ACTIONS_APP_NAME = "GitHub Actions";
+export const TRUSTED_GITHUB_ACTIONS_APP_SLUG = "github-actions";
 
 export function isExactOwnerApprovalComment(comment) {
   return (
     comment?.body === OWNER_APPROVAL_COMMAND &&
     comment.user?.type === "User" &&
-    (comment.user?.login === OWNER_LOGIN || Number(comment.user?.id) === OWNER_ID)
+    comment.user?.id === OWNER_ID
   );
 }
 
@@ -32,20 +35,66 @@ export function isOwnerApprovalTarget(pullRequest) {
   return pullRequest?.state === "open" && pullRequest?.base?.ref === TARGET_BRANCH;
 }
 
+function isFullSha(value) {
+  return typeof value === "string" && /^[0-9a-f]{40}$/i.test(value);
+}
+
 export function isEligiblePullRequest(pullRequest) {
   return (
     isOwnerApprovalTarget(pullRequest) &&
     typeof pullRequest?.number === "number" &&
-    /^[0-9a-f]{40}$/i.test(pullRequest?.head?.sha ?? "")
+    isFullSha(pullRequest?.head?.sha)
   );
+}
+
+function isTrustedGitHubActionsPublisher(checkRun) {
+  const app = checkRun?.app;
+
+  return (
+    app?.id === TRUSTED_GITHUB_ACTIONS_APP_ID &&
+    app?.name === TRUSTED_GITHUB_ACTIONS_APP_NAME &&
+    app?.slug === TRUSTED_GITHUB_ACTIONS_APP_SLUG
+  );
+}
+
+function approvalCommentIdFromOutput(outputText) {
+  if (typeof outputText !== "string") {
+    return undefined;
+  }
+
+  const match = new RegExp(`(?:^|\\n)${APPROVAL_COMMENT_MARKER} ([1-9][0-9]*)(?:\\n|$)`).exec(
+    outputText,
+  );
+
+  return match?.[1];
+}
+
+function hasValidManagedOutput(checkRun, currentHeadSha) {
+  const outputText = checkRun?.output?.text;
+
+  if (
+    typeof outputText !== "string" ||
+    !outputText.startsWith(`${MANAGED_CHECK_MARKER}\nCurrent head SHA: ${currentHeadSha}\n`)
+  ) {
+    return false;
+  }
+
+  const approvalCommentId = approvalCommentIdFromOutput(outputText);
+
+  return checkRun.conclusion === "success"
+    ? approvalCommentId !== undefined
+    : approvalCommentId === undefined;
 }
 
 export function isManagedOwnerApprovalCheckRun(checkRun, currentHeadSha) {
   return (
     checkRun?.name === OWNER_APPROVAL_CHECK_NAME &&
+    isFullSha(currentHeadSha) &&
     checkRun?.head_sha === currentHeadSha &&
-    typeof checkRun?.output?.text === "string" &&
-    checkRun.output.text.includes(MANAGED_CHECK_MARKER)
+    checkRun?.status === "completed" &&
+    (checkRun?.conclusion === "success" || checkRun?.conclusion === "failure") &&
+    hasValidManagedOutput(checkRun, currentHeadSha) &&
+    isTrustedGitHubActionsPublisher(checkRun)
   );
 }
 
@@ -57,11 +106,7 @@ export function getManagedApprovalCommentId(checkRun, currentHeadSha) {
     return undefined;
   }
 
-  const match = new RegExp(`(?:^|\\n)${APPROVAL_COMMENT_MARKER} ([1-9][0-9]*)(?:\\n|$)`).exec(
-    checkRun.output.text,
-  );
-
-  return match?.[1];
+  return approvalCommentIdFromOutput(checkRun.output.text);
 }
 
 export function evaluateOwnerApproval({
@@ -116,7 +161,7 @@ export function evaluateOwnerApproval({
 }
 
 export function buildOwnerApprovalCheckPayload({ decision }) {
-  if (!/^[0-9a-f]{40}$/i.test(decision?.headSha ?? "")) {
+  if (!isFullSha(decision?.headSha)) {
     throw new Error("Owner approval checks require a full current head SHA.");
   }
 
@@ -305,7 +350,7 @@ function runWorkflow() {
   } catch (error) {
     const fallbackHeadSha = event.pull_request?.head?.sha;
 
-    if (!/^[0-9a-f]{40}$/i.test(fallbackHeadSha ?? "")) {
+    if (!isFullSha(fallbackHeadSha)) {
       throw error;
     }
 
@@ -328,7 +373,7 @@ function runWorkflow() {
     return;
   }
 
-  if (!/^[0-9a-f]{40}$/i.test(currentHeadSha ?? "")) {
+  if (!isFullSha(currentHeadSha)) {
     throw new Error("The pull request did not return a full head SHA.");
   }
 

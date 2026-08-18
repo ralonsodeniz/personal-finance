@@ -42,6 +42,38 @@ Secret scanning, push protection, Dependabot security alerts/security updates,
 CodeQL, dependency review, and the Owner approval workflow are configured by
 the prerequisite issues and remain independent deterministic controls.
 
+`Owner approval` is release authorization, not code review. The workflow's
+internal job is named `Recompute current approval state`; that supporting job
+is not an additional required context or merge authority. The required context
+remains exactly `Owner approval`.
+
+## Operator merge sequence
+
+For each pull request, follow this order against the current GitHub state:
+
+1. Review the current pull-request diff and confirm that the target branch is
+   `main`.
+2. Wait for all non-Owner required contexts to pass for the current head:
+   `Root quality gate`, `CodeQL analysis`, and `Dependency review`.
+3. Re-fetch the checks and verify the exact required-context names are
+   `Root quality gate`, `Owner approval`, `CodeQL analysis`, and
+   `Dependency review`. Confirm that the only remaining blocker is `Owner
+approval`; the supporting `Recompute current approval state` job does not
+   add another required merge authority.
+4. Post a comment whose complete body is exactly `/owner-approve` as the
+   canonical owner.
+5. Re-fetch the current head SHA, exact approval comment ID, check results, and
+   pull-request merge state after the workflow recomputes authorization.
+6. Merge only when all four required contexts pass for that current head and
+   GitHub reports `mergeState is clean` (`mergeStateStatus: CLEAN`).
+
+The final read-only inspection can use:
+
+```bash
+gh pr checks <number>
+gh pr view <number> --json headRefOid,baseRefName,state,statusCheckRollup,mergeStateStatus
+```
+
 ## Re-authorize a new head SHA
 
 After any new commit is pushed to a pull-request branch:
@@ -50,11 +82,14 @@ After any new commit is pushed to a pull-request branch:
 2. Wait for the `synchronize` event to publish a non-successful Owner approval
    result for the new full head SHA. An approval for the previous head is not
    reusable.
-3. Add a comment whose complete body is exactly `/owner-approve` as the
+3. Wait for the non-Owner required contexts to pass, then verify the exact
+   required-context set and that Owner approval is the only remaining blocker.
+4. Add a comment whose complete body is exactly `/owner-approve` as the
    canonical owner `ralonsodeniz` (immutable user ID `28633982`).
-4. Confirm that `Owner approval` is successful for the new head SHA and that
+5. Re-fetch the current state. Confirm that `Owner approval` is successful for
+   the new head SHA and that
    the Root quality gate, CodeQL analysis, and dependency review contexts are
-   also successful.
+   also successful, then merge only when `mergeStateStatus` is `CLEAN`.
 
 When normal human approvals are later enabled, update the protection rule to
 set `require_last_push_approval: true` and obtain an independent approval for
