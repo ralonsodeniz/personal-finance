@@ -80,7 +80,7 @@ assertAllExcludes(
 
 assertAllIncludes(
   readFileSync(documentationPath, "utf8"),
-  ["CodeQL / CodeQL analysis", "Dependency review / Dependency review"],
+  ["CodeQL analysis", "Dependency review"],
   "security-gates documentation",
 );
 
