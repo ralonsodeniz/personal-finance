@@ -255,6 +255,73 @@ describe("Codex review protocol", () => {
     ).toBe("failure");
   });
 
+  it("ignores malformed stale-head evidence when the current head has a valid PASS", () => {
+    const staleMalformedResult = `${reviewBody(previousHeadSha, "PASS")}\nTrailing prose`;
+    const decision = decisionFor([
+      codexComment({ id: 402, body: staleMalformedResult }),
+      codexComment({ id: 403 }),
+    ]);
+
+    expect(decision).toMatchObject({
+      conclusion: "success",
+      headSha: currentHeadSha,
+      result: "PASS",
+      resultCommentId: "403",
+    });
+  });
+
+  it("recognizes stale head lines despite blank or reordered protocol fields", () => {
+    const malformedStaleBodies = [
+      `${CODEX_REVIEW_PROTOCOL_MARKER}\n\nResult: PASS\nReviewed head SHA: ${previousHeadSha}`,
+      `${CODEX_REVIEW_PROTOCOL_MARKER}\nResult: PASS\nReviewed head SHA: ${previousHeadSha}`,
+    ];
+
+    for (const [index, body] of malformedStaleBodies.entries()) {
+      const decision = decisionFor([
+        codexComment({ id: 402 + index, body }),
+        codexComment({ id: 404 + index }),
+      ]);
+
+      expect(decision).toMatchObject({
+        conclusion: "success",
+        headSha: currentHeadSha,
+        result: "PASS",
+        resultCommentId: String(404 + index),
+      });
+    }
+  });
+
+  it("recognizes uniquely identifiable stale heads after prose-adjacent markers", () => {
+    const staleBody = `Older review prose${CODEX_REVIEW_PROTOCOL_MARKER}\nResult: PASS\nReviewed head SHA: ${previousHeadSha}`;
+    const decision = decisionFor([
+      codexComment({ id: 504, body: staleBody }),
+      codexComment({ id: 505 }),
+    ]);
+
+    expect(decision).toMatchObject({
+      conclusion: "success",
+      headSha: currentHeadSha,
+      result: "PASS",
+      resultCommentId: "505",
+    });
+  });
+
+  it("fails malformed current or ambiguous head evidence closed", () => {
+    const malformedCurrentBody = `${CODEX_REVIEW_PROTOCOL_MARKER}\nResult: PASS\n\nReviewed head SHA: ${currentHeadSha}`;
+    expect(
+      decisionFor([
+        codexComment({ id: 402, body: malformedCurrentBody }),
+        codexComment({ id: 403 }),
+      ]).conclusion,
+    ).toBe("failure");
+
+    const ambiguousBody = `${CODEX_REVIEW_PROTOCOL_MARKER}\nReviewed head SHA: ${previousHeadSha}\nResult: PASS\nReviewed head SHA: ${currentHeadSha}`;
+    expect(
+      decisionFor([codexComment({ id: 404, body: ambiguousBody }), codexComment({ id: 405 })])
+        .conclusion,
+    ).toBe("failure");
+  });
+
   it("invalidates a previous-head result until the new head has a fresh result", () => {
     const oldResult = codexComment({ body: reviewBody(previousHeadSha, "PASS") });
 
