@@ -78,10 +78,54 @@ assertAllExcludes(
   dependencyReviewPath,
 );
 
+const codexReviewPath = ".github/workflows/codex-review.yml";
+const codexReviewWorkflow = readRepositoryFile(codexReviewPath);
+
+assertAllIncludes(
+  codexReviewWorkflow,
+  [
+    "name: Codex review",
+    "pull_request_target:",
+    "issue_comment:",
+    "checks: write",
+    "contents: read",
+    "issues: read",
+    "pull-requests: read",
+    "repository: ralonsodeniz/personal-finance",
+    "ref: main",
+    "persist-credentials: false",
+    "run: node scripts/codex-review.mjs",
+    "name: Recompute current Codex review state",
+  ],
+  codexReviewPath,
+);
+
+assertAllExcludes(
+  codexReviewWorkflow,
+  [
+    "pull_request:\n",
+    "contents: write",
+    "issues: write",
+    "pull-requests: write",
+    "OPENAI_API_KEY",
+    "codex-action",
+    "pnpm install",
+    "npm install",
+    "github.event.pull_request.head.sha",
+  ],
+  codexReviewPath,
+);
+
 assertAllIncludes(
   readFileSync(documentationPath, "utf8"),
   ["CodeQL analysis", "Dependency review"],
   "security-gates documentation",
+);
+
+assertAllIncludes(
+  readRepositoryFile("docs/agents/codex-review.md"),
+  ["compatibility bridge", "@codex review", "official status API"],
+  "Codex review documentation",
 );
 
 const severityRank = new Map([
