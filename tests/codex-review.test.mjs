@@ -175,6 +175,17 @@ describe("Codex review protocol", () => {
     });
   });
 
+  it("does not authorize a dismissed native pull-request review", () => {
+    const decision = evaluateCodexReview({
+      comments: [],
+      pullRequestReviews: [nativePullRequestReview({ state: "dismissed" })],
+      pullRequestReviewComments: [],
+      pullRequest: pullRequest(),
+    });
+
+    expect(decision.conclusion).toBe("failure");
+  });
+
   it("combines issue comments and inline review comments at the current-head boundary", () => {
     const decision = evaluateCodexReview({
       comments: [codexComment({ id: 503, body: reviewBody(previousHeadSha, "PASS") })],
