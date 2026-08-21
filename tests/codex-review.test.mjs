@@ -6,9 +6,9 @@ import {
   CODEX_LOGIN,
   CODEX_REVIEW_CHECK_NAME,
   CODEX_REVIEW_GATE_MARKER,
-  CODEX_REVIEW_PROTOCOL_MARKER,
   CODEX_USER_ID,
   GH_API_TIMEOUT_MS,
+  NATIVE_CODEX_NO_MAJOR_PREFIX,
   TARGET_BRANCH,
   TRUSTED_GITHUB_ACTIONS_APP_ID,
   TRUSTED_GITHUB_ACTIONS_APP_NAME,
@@ -51,13 +51,17 @@ const trustedGitHubActionsApp = {
   slug: TRUSTED_GITHUB_ACTIONS_APP_SLUG,
 };
 
-function reviewBody(headSha, result) {
-  return `${CODEX_REVIEW_PROTOCOL_MARKER}\nReviewed head SHA: ${headSha}\nResult: ${result}`;
+function observedNativeNoMajorBody(headSha = currentHeadSha) {
+  return `${NATIVE_CODEX_NO_MAJOR_PREFIX} Can't wait for the next one!\n\n**Reviewed commit:** \`${headSha.slice(0, 10)}\``;
+}
+
+function legacyMarkerBody(headSha, result) {
+  return `<!-- codex-review: v1 -->\nReviewed head SHA: ${headSha}\nResult: ${result}`;
 }
 
 function codexComment(overrides = {}) {
   return {
-    body: reviewBody(currentHeadSha, "PASS"),
+    body: observedNativeNoMajorBody(),
     id: 401,
     user: { id: CODEX_USER_ID, login: CODEX_LOGIN, type: CODEX_USER_TYPE },
     ...overrides,
@@ -65,11 +69,18 @@ function codexComment(overrides = {}) {
 }
 
 function nativePullRequestReview(overrides = {}) {
-  return codexComment({ id: 501, ...overrides });
+  return codexComment({ id: 501, commit_id: currentHeadSha, ...overrides });
 }
 
 function nativePullRequestReviewComment(overrides = {}) {
-  return codexComment({ id: 502, ...overrides });
+  return {
+    body: "A current-head native Codex finding.",
+    id: 502,
+    commit_id: currentHeadSha,
+    pull_request_review_id: 501,
+    user: { id: CODEX_USER_ID, login: CODEX_LOGIN, type: CODEX_USER_TYPE },
+    ...overrides,
+  };
 }
 
 function pullRequest(overrides = {}) {
@@ -87,21 +98,42 @@ function decisionFor(comments, overrides = {}) {
 }
 
 describe("Codex review protocol", () => {
-  it("parses only the exact final machine-readable result block", () => {
-    expect(parseCodexReviewResult(reviewBody(currentHeadSha, "PASS"))).toEqual({
+  it("accepts the observed native no-major-issues issue comment for the current head", () => {
+    const decision = evaluateCodexReview({
+      comments: [
+        codexComment({
+          body: observedNativeNoMajorBody(),
+          id: 601,
+        }),
+      ],
+      pullRequest: pullRequest(),
+    });
+
+    expect(decision).toMatchObject({
+      conclusion: "success",
       headSha: currentHeadSha,
       result: "PASS",
+      resultCommentId: "601",
     });
-    expect(
-      parseCodexReviewResult(
-        `Review details\n\n${reviewBody(currentHeadSha, "CHANGES_REQUESTED")}`,
-      ),
-    ).toEqual({ headSha: currentHeadSha, result: "CHANGES_REQUESTED" });
-    expect(parseCodexReviewResult(`${reviewBody(currentHeadSha, "PASS")}\nMore text`)).toBe(
+  });
+
+  it("parses only the observed native no-major-issues result", () => {
+    expect(parseCodexReviewResult(observedNativeNoMajorBody())).toEqual({
+      headSha: currentHeadSha.slice(0, 10),
+      result: "PASS",
+    });
+    expect(parseCodexReviewResult(`Review details\n\n${observedNativeNoMajorBody()}`)).toBe(
       undefined,
     );
-    expect(parseCodexReviewResult(reviewBody("short", "PASS"))).toBe(undefined);
-    expect(parseCodexReviewResult(`${CODEX_REVIEW_PROTOCOL_MARKER}\nResult: PASS`)).toBe(undefined);
+    expect(
+      parseCodexReviewResult(`${NATIVE_CODEX_NO_MAJOR_PREFIX}\n\nNo reviewed commit was supplied.`),
+    ).toBe(undefined);
+    expect(
+      parseCodexReviewResult(
+        `${observedNativeNoMajorBody()}\n**Reviewed commit:** \`${previousHeadSha.slice(0, 10)}\``,
+      ),
+    ).toBe(undefined);
+    expect(parseCodexReviewResult(legacyMarkerBody(currentHeadSha, "PASS"))).toBe(undefined);
     expect(parseCodexReviewResult("PASS")).toBe(undefined);
   });
 
@@ -175,6 +207,30 @@ describe("Codex review protocol", () => {
     });
   });
 
+  it("uses full review commit IDs and checks abbreviated native text against them", () => {
+    expect(
+      evaluateCodexReview({
+        comments: [],
+        pullRequestReviews: [
+          nativePullRequestReview({
+            body: observedNativeNoMajorBody(previousHeadSha),
+            commit_id: currentHeadSha,
+          }),
+        ],
+        pullRequestReviewComments: [],
+        pullRequest: pullRequest(),
+      }).conclusion,
+    ).toBe("failure");
+    expect(
+      evaluateCodexReview({
+        comments: [],
+        pullRequestReviews: [nativePullRequestReview({ commit_id: undefined })],
+        pullRequestReviewComments: [],
+        pullRequest: pullRequest(),
+      }).conclusion,
+    ).toBe("failure");
+  });
+
   it("does not authorize a dismissed native pull-request review", () => {
     const decision = evaluateCodexReview({
       comments: [],
@@ -197,11 +253,25 @@ describe("Codex review protocol", () => {
     expect(decision.conclusion).toBe("failure");
   });
 
+  it("ignores dismissed inline evidence when a fresh current result exists", () => {
+    const decision = evaluateCodexReview({
+      comments: [codexComment()],
+      pullRequestReviews: [nativePullRequestReview({ id: 601, state: "dismissed" })],
+      pullRequestReviewComments: [nativePullRequestReviewComment({ pull_request_review_id: 601 })],
+      pullRequest: pullRequest(),
+    });
+
+    expect(decision).toMatchObject({
+      conclusion: "success",
+      resultCommentId: "401",
+    });
+  });
+
   it("combines issue comments and inline review comments at the current-head boundary", () => {
     const decision = evaluateCodexReview({
-      comments: [codexComment({ id: 503, body: reviewBody(previousHeadSha, "PASS") })],
-      pullRequestReviews: [nativePullRequestReview({ body: "Native review summary" })],
-      pullRequestReviewComments: [nativePullRequestReviewComment()],
+      comments: [codexComment({ id: 503, body: observedNativeNoMajorBody(previousHeadSha) })],
+      pullRequestReviews: [nativePullRequestReview({ id: 504 })],
+      pullRequestReviewComments: [],
       pullRequest: pullRequest(),
     });
 
@@ -209,7 +279,43 @@ describe("Codex review protocol", () => {
       conclusion: "success",
       headSha: currentHeadSha,
       result: "PASS",
-      resultCommentId: "502",
+      resultCommentId: "504",
+    });
+  });
+
+  it("rejects an active current-head native inline finding", () => {
+    const decision = evaluateCodexReview({
+      comments: [codexComment()],
+      pullRequestReviews: [nativePullRequestReview({ body: "Native review summary" })],
+      pullRequestReviewComments: [nativePullRequestReviewComment()],
+      pullRequest: pullRequest(),
+    });
+
+    expect(decision.conclusion).toBe("failure");
+  });
+
+  it("fails an unbound active native inline artifact closed", () => {
+    const decision = evaluateCodexReview({
+      comments: [codexComment()],
+      pullRequestReviews: [nativePullRequestReview({ body: "Native review summary" })],
+      pullRequestReviewComments: [nativePullRequestReviewComment({ commit_id: undefined })],
+      pullRequest: pullRequest(),
+    });
+
+    expect(decision.conclusion).toBe("failure");
+  });
+
+  it("does not let a stale inline finding poison a fresh current result", () => {
+    const decision = evaluateCodexReview({
+      comments: [codexComment()],
+      pullRequestReviews: [nativePullRequestReview({ body: "Native review summary" })],
+      pullRequestReviewComments: [nativePullRequestReviewComment({ commit_id: previousHeadSha })],
+      pullRequest: pullRequest(),
+    });
+
+    expect(decision).toMatchObject({
+      conclusion: "success",
+      resultCommentId: "401",
     });
   });
 
@@ -235,8 +341,14 @@ describe("Codex review protocol", () => {
       }).conclusion,
     ).toBe("failure");
     expect(
-      decisionFor([codexComment({ body: reviewBody(currentHeadSha, "CHANGES_REQUESTED") })])
-        .conclusion,
+      evaluateCodexReview({
+        comments: [],
+        pullRequestReviews: [
+          nativePullRequestReview({ state: "CHANGES_REQUESTED", body: "Native review summary" }),
+        ],
+        pullRequestReviewComments: [],
+        pullRequest: pullRequest(),
+      }).conclusion,
     ).toBe("failure");
     expect(
       decisionFor([
@@ -248,28 +360,37 @@ describe("Codex review protocol", () => {
     ).toBe("failure");
   });
 
-  it("fails malformed and untrusted protocol-looking results closed", () => {
+  it("fails malformed, legacy-marker, and untrusted native results closed", () => {
     expect(
       decisionFor([
         codexComment({
-          body: `${CODEX_REVIEW_PROTOCOL_MARKER}\nReviewed head SHA: ${currentHeadSha}`,
+          body: `${NATIVE_CODEX_NO_MAJOR_PREFIX}\n\nNo reviewed commit was supplied.`,
         }),
       ]).conclusion,
     ).toBe("failure");
     expect(
       decisionFor([
         codexComment({
-          body: reviewBody(currentHeadSha, "PASS"),
+          body: `${observedNativeNoMajorBody()}\n**Reviewed commit:** \`${previousHeadSha.slice(0, 10)}\``,
+        }),
+      ]).conclusion,
+    ).toBe("failure");
+    expect(
+      decisionFor([codexComment({ body: legacyMarkerBody(currentHeadSha, "PASS") })]).conclusion,
+    ).toBe("failure");
+    expect(
+      decisionFor([
+        codexComment({
+          body: observedNativeNoMajorBody(),
           user: { id: 999, login: "owner", type: "User" },
         }),
       ]).conclusion,
     ).toBe("failure");
   });
 
-  it("ignores malformed stale-head evidence when the current head has a valid PASS", () => {
-    const staleMalformedResult = `${reviewBody(previousHeadSha, "PASS")}\nTrailing prose`;
+  it("ignores stale native results when the current head has a valid PASS", () => {
     const decision = decisionFor([
-      codexComment({ id: 402, body: staleMalformedResult }),
+      codexComment({ id: 402, body: observedNativeNoMajorBody(previousHeadSha) }),
       codexComment({ id: 403 }),
     ]);
 
@@ -281,66 +402,24 @@ describe("Codex review protocol", () => {
     });
   });
 
-  it("recognizes stale head lines despite blank or reordered protocol fields", () => {
-    const malformedStaleBodies = [
-      `${CODEX_REVIEW_PROTOCOL_MARKER}\n\nResult: PASS\nReviewed head SHA: ${previousHeadSha}`,
-      `${CODEX_REVIEW_PROTOCOL_MARKER}\nResult: PASS\nReviewed head SHA: ${previousHeadSha}`,
-    ];
+  it("fails conflicting reviewed-commit bindings closed", () => {
+    const conflictingIssue = `${observedNativeNoMajorBody()}\n**Reviewed commit:** \`${previousHeadSha.slice(0, 10)}\``;
+    const decision = decisionFor([codexComment({ body: conflictingIssue })]);
 
-    for (const [index, body] of malformedStaleBodies.entries()) {
-      const decision = decisionFor([
-        codexComment({ id: 402 + index, body }),
-        codexComment({ id: 404 + index }),
-      ]);
-
-      expect(decision).toMatchObject({
-        conclusion: "success",
-        headSha: currentHeadSha,
-        result: "PASS",
-        resultCommentId: String(404 + index),
-      });
-    }
-  });
-
-  it("recognizes uniquely identifiable stale heads after prose-adjacent markers", () => {
-    const staleBody = `Older review prose${CODEX_REVIEW_PROTOCOL_MARKER}\nResult: PASS\nReviewed head SHA: ${previousHeadSha}`;
-    const decision = decisionFor([
-      codexComment({ id: 504, body: staleBody }),
-      codexComment({ id: 505 }),
-    ]);
-
-    expect(decision).toMatchObject({
-      conclusion: "success",
-      headSha: currentHeadSha,
-      result: "PASS",
-      resultCommentId: "505",
-    });
-  });
-
-  it("fails malformed current or ambiguous head evidence closed", () => {
-    const malformedCurrentBody = `${CODEX_REVIEW_PROTOCOL_MARKER}\nResult: PASS\n\nReviewed head SHA: ${currentHeadSha}`;
-    expect(
-      decisionFor([
-        codexComment({ id: 402, body: malformedCurrentBody }),
-        codexComment({ id: 403 }),
-      ]).conclusion,
-    ).toBe("failure");
-
-    const ambiguousBody = `${CODEX_REVIEW_PROTOCOL_MARKER}\nReviewed head SHA: ${previousHeadSha}\nResult: PASS\nReviewed head SHA: ${currentHeadSha}`;
-    expect(
-      decisionFor([codexComment({ id: 404, body: ambiguousBody }), codexComment({ id: 405 })])
-        .conclusion,
-    ).toBe("failure");
+    expect(decision.conclusion).toBe("failure");
   });
 
   it("invalidates a previous-head result until the new head has a fresh result", () => {
-    const oldResult = codexComment({ body: reviewBody(previousHeadSha, "PASS") });
+    const oldResult = codexComment({ body: observedNativeNoMajorBody(previousHeadSha) });
 
     expect(decisionFor([oldResult]).conclusion).toBe("failure");
     expect(
-      decisionFor([oldResult, codexComment({ id: 402, body: reviewBody(nextHeadSha, "PASS") })], {
-        head: { sha: nextHeadSha },
-      }).conclusion,
+      decisionFor(
+        [oldResult, codexComment({ id: 402, body: observedNativeNoMajorBody(nextHeadSha) })],
+        {
+          head: { sha: nextHeadSha },
+        },
+      ).conclusion,
     ).toBe("success");
   });
 
@@ -364,15 +443,7 @@ describe("Codex review protocol", () => {
     expect(getEventHeadSha({ issue: { pull_request: { head: { sha: nextHeadSha } } } })).toBe(
       nextHeadSha,
     );
-    expect(getEventHeadSha({ comment: codexComment() })).toBe(currentHeadSha);
-    expect(
-      getEventHeadSha({
-        comment: {
-          body: `${CODEX_REVIEW_PROTOCOL_MARKER}\nReviewed head SHA: ${currentHeadSha}`,
-          user: { id: CODEX_USER_ID, login: CODEX_LOGIN, type: CODEX_USER_TYPE },
-        },
-      }),
-    ).toBe(currentHeadSha);
+    expect(getEventHeadSha({ comment: codexComment() })).toBeUndefined();
     expect(
       getEventHeadSha({
         comment: codexComment({
@@ -410,11 +481,16 @@ describe("Codex review protocol", () => {
 
   it("fails duplicate or conflicting current-head results", () => {
     expect(decisionFor([codexComment(), codexComment({ id: 402 })]).conclusion).toBe("failure");
+    expect(decisionFor([codexComment(), codexComment({ id: 402 })]).conclusion).toBe("failure");
     expect(
-      decisionFor([
-        codexComment(),
-        codexComment({ id: 402, body: reviewBody(currentHeadSha, "CHANGES_REQUESTED") }),
-      ]).conclusion,
+      evaluateCodexReview({
+        comments: [codexComment()],
+        pullRequestReviews: [
+          nativePullRequestReview({ id: 403, state: "CHANGES_REQUESTED", body: "Native review" }),
+        ],
+        pullRequestReviewComments: [],
+        pullRequest: pullRequest(),
+      }).conclusion,
     ).toBe("failure");
   });
 
@@ -519,14 +595,21 @@ describe("Codex review protocol", () => {
     expect(documentation).toContain(CODEX_USER_TYPE);
     expect(documentation).toContain(String(publicCodexUserId));
     expect(documentation).toContain("native integration");
+    expect(documentation).toContain("@codex review");
+    expect(documentation).toContain("pull_request_review_id");
+    expect(documentation).toContain("MODULE_NOT_FOUND");
+    expect(documentation).toContain("bootstrap");
     expect(documentation).toContain("/owner-approve");
     expect(documentation).toContain("recovery");
 
     const rootAgents = readFileSync(rootAgentsPath, "utf8");
     expect(rootAgents).toContain("## Code Review Rules");
-    expect(rootAgents).toContain("Reviewed head SHA:");
-    expect(rootAgents).toContain("Result: PASS");
-    expect(rootAgents).toContain("Result: CHANGES_REQUESTED");
+    expect(rootAgents).toContain("@codex review");
+    expect(rootAgents).toContain("Reviewed commit");
+    expect(rootAgents).toContain(CODEX_LOGIN);
+    expect(rootAgents).not.toContain("codex-review: v1");
+    expect(rootAgents).not.toContain("Result: PASS");
+    expect(rootAgents).not.toContain("Result: CHANGES_REQUESTED");
   });
 
   it("targets Codex review in the exact protection policy and defers live activation", () => {
@@ -540,6 +623,8 @@ describe("Codex review protocol", () => {
 
     const protectionDocumentation = readFileSync(protectionDocumentationPath, "utf8");
     expect(protectionDocumentation).toContain("Codex review");
+    expect(protectionDocumentation).toContain("@codex review");
+    expect(protectionDocumentation).toContain("MODULE_NOT_FOUND");
     expect(protectionDocumentation).toContain("successful baseline");
     expect(protectionDocumentation).toContain("does not mutate live main protection");
   });

@@ -41,6 +41,11 @@ substitute for a future independent human reviewer.
 Other AI review integrations remain advisory. The native Codex bridge is the
 explicit issue #51 exception and is a required code-review context once its
 control-plane activation is complete.
+It is triggered by one standalone `@codex review` request for the exact head
+and consumes the trusted native issue comment, review, and review-comment
+artifacts. The full GitHub `commit_id` or current PR metadata binds the result;
+the abbreviated `Reviewed commit` text is only a consistency check. Active
+findings and reactions never grant release authorization.
 Secret scanning, push protection, Dependabot security alerts/security updates,
 CodeQL, dependency review, and the Owner approval workflow are configured by
 the prerequisite issues and remain independent deterministic controls.
@@ -58,7 +63,11 @@ expose the previous four-context set. After that successful baseline, explicitly
 add `Codex review` to the live branch-protection rule and rerun
 `pnpm run protection:check`. The current pull request does not run that live
 control-plane assertion, so the deferred mutation does not self-block this
-implementation.
+implementation. The current bridge checkout is trusted `main`; because
+`origin/main` does not yet contain the support script, its pre-bootstrap run
+fails with `MODULE_NOT_FOUND` before evaluation. That is a bootstrap blocker,
+not a passing Codex result, and must be resolved by the safe post-merge
+baseline rather than a PR-code checkout or an administrative bypass.
 
 ## Operator merge sequence
 

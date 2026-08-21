@@ -14,20 +14,25 @@ This is a multi-context repository using root `CONTEXT-MAP.md`, system-wide `doc
 
 ## Code Review Rules
 
-Native Codex review is code-review evidence, not release authorization. When a
-native Codex review is requested, ask it to finish with exactly one
-machine-readable block at the end of its comment, using the full 40-character
-SHA of the commit it actually reviewed:
+Native Codex review is code-review evidence, not release authorization. For an
+implementation or review-fix push, post exactly one standalone `@codex review`
+request for the exact current pull-request head when no request for that SHA is
+already present. Record the request comment ID, timestamp, and full head SHA;
+wait for the trusted native response and repeat the request after every new
+head.
 
-```text
-<!-- codex-review: v1 -->
-Reviewed head SHA: <full 40-character lowercase commit SHA>
-Result: PASS
-```
+The compatibility bridge consumes the native integration's actual GitHub
+artifacts: a trusted issue-conversation result beginning `Codex Review: Didn't
+find any major issues.` with its `Reviewed commit` line, a pull-request review,
+or a pull-request review comment. GitHub's full `commit_id`/current PR metadata
+is authoritative; an abbreviated `Reviewed commit` value is only a
+consistency check. Active current-head findings, changes requested, dismissed
+evidence, missing or malformed binding, stale-only evidence, API failure, and
+ambiguous or conflicting artifacts are non-successful. A reaction is assessment
+telemetry only and never approval.
 
-The result marker must be `PASS` or `CHANGES_REQUESTED`; an unsuccessful review
-uses `Result: CHANGES_REQUESTED` in the same block. A review that cannot
-provide this block for the exact current pull-request head is not a passing
-review. Do not use an arbitrary comment, owner approval, prose, or a reaction
-as a substitute for the native Codex result. `/owner-approve` remains the
-separate human release-authorization command.
+Do not ask native Codex to emit an undocumented custom marker or treat arbitrary
+prose, the public `codex` user, or an owner approval as a native result. The
+trusted publisher is `chatgpt-codex-connector[bot]` (immutable user ID
+`199175422`, GitHub type `Bot`). `/owner-approve` remains the separate human
+release-authorization command.
