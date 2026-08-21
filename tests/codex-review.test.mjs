@@ -21,6 +21,7 @@ import {
   flattenIssueCommentPages,
   flattenPullRequestReviewCommentPages,
   flattenPullRequestReviewPages,
+  getFallbackHeadSha,
   getEventHeadSha,
   getEventPullRequestNumber,
   isManagedCodexReviewCheckRun,
@@ -356,10 +357,45 @@ describe("Codex review protocol", () => {
     });
   });
 
+  it("binds inline review evidence to its parent review commit", () => {
+    const decision = evaluateCodexReview({
+      comments: [codexComment({ id: 703 })],
+      pullRequestReviews: [
+        nativePullRequestReview({
+          id: 701,
+          state: "COMMENTED",
+          commit_id: previousHeadSha,
+          body: "\n### 💡 Codex Review\n\nHere are some automated review suggestions for this pull request.",
+        }),
+      ],
+      pullRequestReviewComments: [
+        nativePullRequestReviewComment({
+          id: 702,
+          pull_request_review_id: 701,
+          commit_id: currentHeadSha,
+          body: "**P1 Badge** Stale-parent finding prose.",
+        }),
+      ],
+      pullRequest: pullRequest(),
+    });
+
+    expect(decision).toMatchObject({
+      conclusion: "success",
+      headSha: currentHeadSha,
+      result: "PASS",
+      resultCommentId: "703",
+    });
+  });
+
   it("accepts a native no-major result published as a current-head review comment", () => {
     const decision = evaluateCodexReview({
       comments: [],
-      pullRequestReviews: [],
+      pullRequestReviews: [
+        nativePullRequestReview({
+          id: 501,
+          body: "\n### 💡 Codex Review\n\nHere are some automated review suggestions for this pull request.",
+        }),
+      ],
       pullRequestReviewComments: [
         nativePullRequestReviewComment({
           body: NATIVE_CODEX_NO_MAJOR_PREFIX,
