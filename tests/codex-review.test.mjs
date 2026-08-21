@@ -186,6 +186,17 @@ describe("Codex review protocol", () => {
     expect(decision.conclusion).toBe("failure");
   });
 
+  it("does not authorize an inline comment belonging to a dismissed review", () => {
+    const decision = evaluateCodexReview({
+      comments: [],
+      pullRequestReviews: [nativePullRequestReview({ id: 601, state: "dismissed" })],
+      pullRequestReviewComments: [nativePullRequestReviewComment({ pull_request_review_id: 601 })],
+      pullRequest: pullRequest(),
+    });
+
+    expect(decision.conclusion).toBe("failure");
+  });
+
   it("combines issue comments and inline review comments at the current-head boundary", () => {
     const decision = evaluateCodexReview({
       comments: [codexComment({ id: 503, body: reviewBody(previousHeadSha, "PASS") })],
