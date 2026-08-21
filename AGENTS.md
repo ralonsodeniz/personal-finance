@@ -36,3 +36,21 @@ prose, the public `codex` user, or an owner approval as a native result. The
 trusted publisher is `chatgpt-codex-connector[bot]` (immutable user ID
 `199175422`, GitHub type `Bot`). `/owner-approve` remains the separate human
 release-authorization command.
+
+### Pull-request lifecycle
+
+For implementation issues and open PRs, read
+[`docs/agents/pr-lifecycle.md`](docs/agents/pr-lifecycle.md). It defines the
+exactly-one-active-lifecycle-owner invariant, monitor recovery and stop
+conditions, manual-merge reconciliation, delegated-versus-human Owner
+authorization, and the `+1`/`-1` review-comment assessment rule. Keep native
+Codex review separate from release authorization.
+
+### Governance checks
+
+The protected merge policy has exactly five required contexts: `Root quality
+gate`, `Owner approval`, `CodeQL analysis`, `Dependency review`, and `Codex
+review`. `Codex review` is the narrow native-bridge exception recorded by
+issues #51 and #55 against parent #38's general advisory-AI policy; it is
+review evidence and never authorizes release. `Owner approval` is the separate
+release gate.

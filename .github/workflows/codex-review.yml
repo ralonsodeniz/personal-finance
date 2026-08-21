@@ -34,8 +34,15 @@ permissions:
   pull-requests: read
 
 concurrency:
-  group: codex-review-${{ github.event.pull_request.number || github.event.issue.number || github.run_id }}
-  cancel-in-progress: true
+  group: >-
+    codex-review-${{
+      github.event_name == 'pull_request_review' && github.run_id ||
+      github.event_name == 'pull_request_review_comment' && github.run_id ||
+      github.event.pull_request.number ||
+      github.event.issue.number ||
+      github.run_id
+    }}
+  cancel-in-progress: false
 
 jobs:
   evaluate:

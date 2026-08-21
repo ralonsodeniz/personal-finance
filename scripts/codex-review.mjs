@@ -15,6 +15,7 @@ export const TRUSTED_GITHUB_ACTIONS_APP_NAME = "GitHub Actions";
 export const TRUSTED_GITHUB_ACTIONS_APP_SLUG = "github-actions";
 export const GH_API_TIMEOUT_MS = 30_000;
 export const GH_API_MAX_BUFFER = 8 * 1024 * 1024;
+export const MAX_PUBLICATION_RECONCILIATIONS = 2;
 
 const CANONICAL_REPOSITORY = "ralonsodeniz/personal-finance";
 
@@ -118,6 +119,186 @@ export function getEventPullRequestNumber(eventName, event) {
   }
 
   return undefined;
+}
+
+function reviewDeliveryMarker(eventName, event) {
+  if (eventName === "pull_request_review") {
+    const review = event?.review;
+
+    return {
+      id: review?.id,
+      kind: "review",
+      timestamp: review?.updated_at ?? review?.submitted_at,
+    };
+  }
+
+  if (eventName === "pull_request_review_comment") {
+    const comment = event?.comment;
+
+    return {
+      id: comment?.id,
+      kind: "review-comment",
+      timestamp: comment?.updated_at ?? comment?.created_at,
+    };
+  }
+
+  return undefined;
+}
+
+function compareReviewDeliveryMarkers(left, right) {
+  const leftTimestamp = Date.parse(left.timestamp ?? "");
+  const rightTimestamp = Date.parse(right.timestamp ?? "");
+
+  if (Number.isFinite(leftTimestamp) && Number.isFinite(rightTimestamp)) {
+    if (leftTimestamp !== rightTimestamp) {
+      return leftTimestamp - rightTimestamp;
+    }
+
+    if (left.kind !== right.kind) {
+      return 0;
+    }
+  }
+
+  const kindDifference = (left.kind === "review" ? 0 : 1) - (right.kind === "review" ? 0 : 1);
+
+  if (kindDifference !== 0) {
+    return kindDifference;
+  }
+
+  return Number(left.id ?? 0) - Number(right.id ?? 0);
+}
+
+function isPullRequestReviewDismissalDelivery(eventName, event) {
+  return (
+    eventName === "pull_request_review" &&
+    (event?.action === "dismissed" || event?.review?.state?.toLowerCase() === "dismissed")
+  );
+}
+
+function isPullRequestReviewCommentDeletionDelivery(eventName, event) {
+  return eventName === "pull_request_review_comment" && event?.action === "deleted";
+}
+
+function isPullRequestReviewCommentEditDelivery(eventName, event) {
+  return eventName === "pull_request_review_comment" && event?.action === "edited";
+}
+
+function isPullRequestReviewEditDelivery(eventName, event) {
+  return eventName === "pull_request_review" && event?.action === "edited";
+}
+
+export function isCurrentReviewDelivery({
+  eventName,
+  event,
+  pullRequestReviews = [],
+  pullRequestReviewComments = [],
+}) {
+  if (
+    isPullRequestReviewDismissalDelivery(eventName, event) ||
+    isPullRequestReviewCommentDeletionDelivery(eventName, event) ||
+    isPullRequestReviewCommentEditDelivery(eventName, event) ||
+    isPullRequestReviewEditDelivery(eventName, event)
+  ) {
+    return true;
+  }
+
+  const currentMarker = reviewDeliveryMarker(eventName, event);
+
+  if (
+    !currentMarker ||
+    !isPositiveInteger(currentMarker.id) ||
+    typeof currentMarker.timestamp !== "string" ||
+    !Number.isFinite(Date.parse(currentMarker.timestamp))
+  ) {
+    return true;
+  }
+
+  const deliveryMarkers = [
+    ...pullRequestReviews.map((review) => ({
+      id: review?.id,
+      kind: "review",
+      timestamp: review?.updated_at ?? review?.submitted_at,
+    })),
+    ...pullRequestReviewComments.map((comment) => ({
+      id: comment?.id,
+      kind: "review-comment",
+      timestamp: comment?.updated_at ?? comment?.created_at,
+    })),
+  ].filter(
+    (marker) =>
+      isPositiveInteger(marker.id) &&
+      typeof marker.timestamp === "string" &&
+      Number.isFinite(Date.parse(marker.timestamp)),
+  );
+
+  return deliveryMarkers.every(
+    (marker) => compareReviewDeliveryMarkers(currentMarker, marker) >= 0,
+  );
+}
+
+function isReviewDeliveryEvent(eventName) {
+  return eventName === "pull_request_review" || eventName === "pull_request_review_comment";
+}
+
+function sameCodexReviewDecision(left, right) {
+  return (
+    left?.conclusion === right?.conclusion &&
+    left?.headSha === right?.headSha &&
+    left?.reason === right?.reason &&
+    left?.result === right?.result &&
+    left?.resultCommentId === right?.resultCommentId
+  );
+}
+
+export function isManagedCodexReviewCheckCurrent(checkRuns, decision) {
+  if (!Array.isArray(checkRuns) || !isFullSha(decision?.headSha)) {
+    return false;
+  }
+
+  let expectedPayload;
+
+  try {
+    expectedPayload = buildCodexReviewCheckPayload({ decision });
+  } catch {
+    return false;
+  }
+
+  const managedCheckRuns = checkRuns.filter((checkRun) =>
+    isManagedCodexReviewCheckRun(checkRun, decision.headSha),
+  );
+
+  return (
+    managedCheckRuns.length > 0 &&
+    managedCheckRuns.every(
+      (checkRun) =>
+        checkRun.conclusion === expectedPayload.conclusion &&
+        checkRun.output?.title === expectedPayload.output.title &&
+        checkRun.output?.summary === expectedPayload.output.summary &&
+        checkRun.output?.text === expectedPayload.output.text,
+    )
+  );
+}
+
+export function isCodexReviewPublicationCurrent({
+  event,
+  eventName,
+  publishedDecision,
+  currentDecision,
+  currentCheckRuns = [],
+  pullRequestReviewComments = [],
+  pullRequestReviews = [],
+}) {
+  return (
+    sameCodexReviewDecision(publishedDecision, currentDecision) &&
+    isManagedCodexReviewCheckCurrent(currentCheckRuns, currentDecision) &&
+    (!isReviewDeliveryEvent(eventName) ||
+      isCurrentReviewDelivery({
+        event,
+        eventName,
+        pullRequestReviewComments,
+        pullRequestReviews,
+      }))
+  );
 }
 
 export function getEventHeadSha(event) {
@@ -766,6 +947,227 @@ function publishMetadataFailure({ owner, repo, event, pullRequestNumber, reason,
   throw originalError;
 }
 
+function readCodexReviewState({ owner, repo, pullRequestNumber, currentHeadSha }) {
+  let comments = [];
+  let commentsError;
+
+  try {
+    comments = commentsFromApi({ owner, repo, number: pullRequestNumber });
+  } catch (error) {
+    commentsError = error;
+  }
+
+  let pullRequestReviews = [];
+  let pullRequestReviewsError;
+
+  try {
+    pullRequestReviews = pullRequestReviewsFromApi({ owner, repo, number: pullRequestNumber });
+  } catch (error) {
+    pullRequestReviewsError = error;
+  }
+
+  let pullRequestReviewComments = [];
+  let pullRequestReviewCommentsError;
+
+  try {
+    pullRequestReviewComments = pullRequestReviewCommentsFromApi({
+      owner,
+      repo,
+      number: pullRequestNumber,
+    });
+  } catch (error) {
+    pullRequestReviewCommentsError = error;
+  }
+
+  let checkRuns = [];
+  let checkRunsError;
+
+  try {
+    checkRuns = checkRunsFromApi({ owner, repo, headSha: currentHeadSha });
+  } catch (error) {
+    checkRunsError = error;
+  }
+
+  return {
+    checkRuns,
+    checkRunsError,
+    comments,
+    commentsError,
+    pullRequestReviewComments,
+    pullRequestReviewCommentsError,
+    pullRequestReviews,
+    pullRequestReviewsError,
+  };
+}
+
+function reviewStateError(reviewState) {
+  return (
+    reviewState.commentsError ??
+    reviewState.pullRequestReviewsError ??
+    reviewState.pullRequestReviewCommentsError ??
+    reviewState.checkRunsError
+  );
+}
+
+function decisionFromReviewState({ pullRequest, currentHeadSha, reviewState }) {
+  return reviewStateError(reviewState)
+    ? failureDecision(
+        currentHeadSha,
+        "The current native Codex review state could not be verified; retry is required.",
+      )
+    : evaluateCodexReview({
+        comments: reviewState.comments,
+        pullRequestReviews: reviewState.pullRequestReviews,
+        pullRequestReviewComments: reviewState.pullRequestReviewComments,
+        pullRequest,
+      });
+}
+
+function publishDecisionAndReconcile({
+  currentHeadSha,
+  event,
+  eventName,
+  initialDecision,
+  initialReviewState,
+  owner,
+  pullRequest,
+  pullRequestNumber,
+  repo,
+}) {
+  let decision = initialDecision;
+  let publicationEvent = event;
+  let publicationEventName = eventName;
+  let reviewState = initialReviewState;
+
+  for (let attempt = 0; attempt <= MAX_PUBLICATION_RECONCILIATIONS; attempt += 1) {
+    const verificationError = reviewStateError(reviewState);
+
+    if (verificationError) {
+      publishDecision({
+        existingCheckRuns: reviewState.checkRuns,
+        owner,
+        repo,
+        decision,
+      });
+      console.error(verificationError);
+      throw verificationError;
+    }
+
+    const supersededReviewDelivery =
+      attempt === 0 &&
+      isReviewDeliveryEvent(eventName) &&
+      !isCurrentReviewDelivery({
+        event,
+        eventName,
+        pullRequestReviewComments: reviewState.pullRequestReviewComments,
+        pullRequestReviews: reviewState.pullRequestReviews,
+      });
+
+    if (supersededReviewDelivery) {
+      publishDecision({
+        existingCheckRuns: reviewState.checkRuns,
+        owner,
+        repo,
+        decision,
+      });
+      console.log("Skipping a superseded review delivery; a newer delivery owns recomputation.");
+      publicationEvent = undefined;
+      publicationEventName = undefined;
+    } else {
+      publishDecision({
+        existingCheckRuns: reviewState.checkRuns,
+        owner,
+        repo,
+        decision,
+      });
+    }
+
+    const currentReviewState = readCodexReviewState({
+      currentHeadSha,
+      owner,
+      pullRequestNumber,
+      repo,
+    });
+    const currentVerificationError = reviewStateError(currentReviewState);
+
+    if (currentVerificationError) {
+      publishDecision({
+        existingCheckRuns: currentReviewState.checkRuns,
+        owner,
+        repo,
+        decision: failureDecision(
+          currentHeadSha,
+          "The current native Codex review state could not be verified after publication; retry is required.",
+        ),
+      });
+      console.error(currentVerificationError);
+      throw currentVerificationError;
+    }
+
+    const currentDecision = decisionFromReviewState({
+      currentHeadSha,
+      pullRequest,
+      reviewState: currentReviewState,
+    });
+
+    if (
+      isCodexReviewPublicationCurrent({
+        currentDecision,
+        event: publicationEvent,
+        eventName: publicationEventName,
+        publishedDecision: decision,
+        currentCheckRuns: currentReviewState.checkRuns,
+        pullRequestReviewComments: currentReviewState.pullRequestReviewComments,
+        pullRequestReviews: currentReviewState.pullRequestReviews,
+      })
+    ) {
+      return;
+    }
+
+    if (sameCodexReviewDecision(decision, currentDecision)) {
+      if (attempt === MAX_PUBLICATION_RECONCILIATIONS) {
+        const reconciliationError = new Error(
+          "The managed Codex review check did not match the authoritative decision; retry is required.",
+        );
+        publishDecision({
+          existingCheckRuns: currentReviewState.checkRuns,
+          owner,
+          repo,
+          decision: failureDecision(currentHeadSha, reconciliationError.message),
+        });
+        throw reconciliationError;
+      }
+
+      console.log(
+        "The managed Codex review check was overwritten; republishing the same decision.",
+      );
+      publicationEvent = undefined;
+      publicationEventName = undefined;
+      reviewState = currentReviewState;
+      decision = currentDecision;
+      continue;
+    }
+
+    if (attempt === MAX_PUBLICATION_RECONCILIATIONS) {
+      const reconciliationError = new Error(
+        "The native Codex review state changed during check publication; retry is required.",
+      );
+      publishDecision({
+        existingCheckRuns: currentReviewState.checkRuns,
+        owner,
+        repo,
+        decision: failureDecision(currentHeadSha, reconciliationError.message),
+      });
+      throw reconciliationError;
+    }
+
+    reviewState = currentReviewState;
+    decision = currentDecision;
+    publicationEvent = undefined;
+    publicationEventName = undefined;
+  }
+}
+
 function runWorkflow() {
   const { owner, repo } = canonicalRepositoryParts();
   const eventName = process.env.GITHUB_EVENT_NAME;
@@ -815,82 +1217,38 @@ function runWorkflow() {
     throw new Error("The pull request did not return a full head SHA.");
   }
 
-  let comments;
-  let commentsError;
-
-  try {
-    comments = commentsFromApi({ owner, repo, number: pullRequestNumber });
-  } catch (error) {
-    comments = [];
-    commentsError = error;
-  }
-
-  let pullRequestReviews;
-  let pullRequestReviewsError;
-
-  try {
-    pullRequestReviews = pullRequestReviewsFromApi({ owner, repo, number: pullRequestNumber });
-  } catch (error) {
-    pullRequestReviews = [];
-    pullRequestReviewsError = error;
-  }
-
-  let pullRequestReviewComments;
-  let pullRequestReviewCommentsError;
-
-  try {
-    pullRequestReviewComments = pullRequestReviewCommentsFromApi({
-      owner,
-      repo,
-      number: pullRequestNumber,
-    });
-  } catch (error) {
-    pullRequestReviewComments = [];
-    pullRequestReviewCommentsError = error;
-  }
-
-  let checkRuns;
-  let checkRunsError;
-
-  try {
-    checkRuns = checkRunsFromApi({ owner, repo, headSha: currentHeadSha });
-  } catch (error) {
-    checkRuns = [];
-    checkRunsError = error;
-  }
-
-  const decision =
-    commentsError || pullRequestReviewsError || pullRequestReviewCommentsError || checkRunsError
-      ? failureDecision(
-          currentHeadSha,
-          "The current native Codex review state could not be verified; retry is required.",
-        )
-      : evaluateCodexReview({
-          comments,
-          pullRequestReviews,
-          pullRequestReviewComments,
-          pullRequest,
-        });
-
-  publishDecision({
-    existingCheckRuns: checkRuns,
+  let reviewState = readCodexReviewState({
+    currentHeadSha,
     owner,
+    pullRequestNumber,
     repo,
-    decision,
   });
+  let decision = decisionFromReviewState({ currentHeadSha, pullRequest, reviewState });
 
-  if (
-    commentsError ||
-    pullRequestReviewsError ||
-    pullRequestReviewCommentsError ||
-    checkRunsError
-  ) {
-    const verificationError =
-      commentsError ?? pullRequestReviewsError ?? pullRequestReviewCommentsError ?? checkRunsError;
-
-    console.error(verificationError);
-    throw verificationError;
+  if (isReviewDeliveryEvent(eventName) && !reviewStateError(reviewState)) {
+    // Re-read immediately before the freshness fence and check update. This final
+    // generation prevents an older delivery from publishing a decision from its
+    // first, already-stale review snapshot.
+    reviewState = readCodexReviewState({
+      currentHeadSha,
+      owner,
+      pullRequestNumber,
+      repo,
+    });
+    decision = decisionFromReviewState({ currentHeadSha, pullRequest, reviewState });
   }
+
+  publishDecisionAndReconcile({
+    currentHeadSha,
+    event,
+    eventName,
+    initialDecision: decision,
+    initialReviewState: reviewState,
+    owner,
+    pullRequest,
+    pullRequestNumber,
+    repo,
+  });
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])) {

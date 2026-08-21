@@ -39,39 +39,55 @@ is false because no CODEOWNERS policy is in scope and the owner check is not a
 substitute for a future independent human reviewer.
 
 Other AI review integrations remain advisory. The native Codex bridge is the
-explicit issue #51 exception and is a required code-review context once its
-control-plane activation is complete.
-It is triggered by one standalone `@codex review` request for the exact head
-and consumes the trusted native issue comment, review, and review-comment
-artifacts. The full GitHub `commit_id` or current PR metadata binds the result;
-the abbreviated `Reviewed commit` text is only a consistency check. Active
-findings and reactions never grant release authorization.
+explicit issue #51 exception accepted by issue #55 against the general issue
+#38 advisory-AI policy. It is a repository-owned compatibility bridge around
+the native integration, not an API-key action or a general AI availability
+promise. Its required `Codex review` context is code-review evidence only;
+`/owner-approve` remains the separate release authorization. It is triggered
+by one standalone `@codex review` request for the exact head and consumes the
+trusted native issue comment, review, and review-comment artifacts. The full
+GitHub `commit_id` or current PR metadata binds the result; the abbreviated
+`Reviewed commit` text is only a consistency check. Active findings and
+reactions never grant release authorization.
 Secret scanning, push protection, Dependabot security alerts/security updates,
 CodeQL, dependency review, and the Owner approval workflow are configured by
 the prerequisite issues and remain independent deterministic controls.
 
 `Owner approval` is release authorization, not code review. The workflow's
 internal job is named `Recompute current approval state`; that supporting job
-is not an additional required context or merge authority. The required context
-remains exactly `Owner approval`; `Codex review` is a separate review context
-and never grants release authorization.
+is not an additional required context or merge authority. The required owner
+context remains exactly `Owner approval`; `Codex review` is a separate review
+context and never grants release authorization.
 
-The verifier's exact required-context target includes `Codex review`. This issue
-does not mutate live main protection: until this workflow is merged from `main`
-and a successful baseline `Codex review` check is observed, live `main` may still
-expose the previous four-context set. After that successful baseline, explicitly
-add `Codex review` to the live branch-protection rule and rerun
-`pnpm run protection:check`. The current pull request does not run that live
-control-plane assertion, so the deferred mutation does not self-block this
-implementation. The trusted-main bootstrap is complete: merged PR #53 added the
-workflow to `main`, and merged PR #54 added the parent-review-bound evaluator.
-The current bridge still checks out trusted `main` and never executes
-pull-request code. Any earlier `MODULE_NOT_FOUND` run is historical bootstrap
-evidence, not a current blocker or a passing Codex result.
-The structured branch-protection entry for `Codex review` must also carry
-`app_id: 15368` for the GitHub Actions app. A null or different publisher
-binding fails the verifier; this binding is part of the same deferred
-post-bootstrap control-plane update.
+The verifier and this document target the exact five-context policy, including
+the structured Codex publisher binding `app_id: 15368` for GitHub Actions.
+This implementation does not mutate live main protection. After this change
+is merged, first observe one successful baseline `Codex review` check for the
+current head,
+then run the following authenticated control-plane update with the existing
+four contexts preserved:
+
+```bash
+gh auth status
+gh repo view ralonsodeniz/personal-finance --json nameWithOwner,url,defaultBranchRef
+gh api --method PATCH repos/ralonsodeniz/personal-finance/branches/main/protection/required_status_checks --input - <<'JSON'
+{"strict":true,"contexts":["Root quality gate","Owner approval","CodeQL analysis","Dependency review","Codex review"],"checks":[{"context":"Root quality gate","app_id":15368},{"context":"Owner approval","app_id":null},{"context":"CodeQL analysis","app_id":15368},{"context":"Dependency review","app_id":15368},{"context":"Codex review","app_id":15368}]}
+JSON
+pnpm run protection:check
+```
+
+Expected result after the authorized update is HTTP `200`, followed by the
+verifier's success message reporting five required contexts and Codex bound to
+GitHub Actions app `15368`. No command above was executed as part of this
+implementation.
+
+The trusted-main bootstrap is complete: merged PR #53 added the workflow to
+`main`, and merged PR #54 added the parent-review-bound evaluator. The current
+bridge still checks out trusted `main` and never executes pull-request code.
+Any earlier `MODULE_NOT_FOUND` run is historical bootstrap evidence, not a
+current blocker or a passing Codex result. A null or different structured
+publisher binding fails the verifier; the `app_id: 15368` binding is part of
+the same deferred post-bootstrap control-plane update.
 
 ## Operator merge sequence
 
@@ -114,10 +130,9 @@ After any new commit is pushed to a pull-request branch:
 4. Add a comment whose complete body is exactly `/owner-approve` as the
    canonical owner `ralonsodeniz` (immutable user ID `28633982`).
 5. Re-fetch the current state. Confirm that `Owner approval` is successful for
-   the new head SHA and that
-   the Root quality gate, CodeQL analysis, dependency review, and Codex review
-   contexts are also successful, then merge only when `mergeStateStatus` is
-   `CLEAN`.
+   the new head SHA and that the Root quality gate, CodeQL analysis, dependency
+   review, and Codex review contexts are also successful, then merge only when
+   `mergeStateStatus` is `CLEAN`.
 
 When normal human approvals are later enabled, update the protection rule to
 set `require_last_push_approval: true` and obtain an independent approval for
@@ -148,7 +163,7 @@ calls. It fails if the required contexts, strict up-to-date behavior, review
 settings, conversation resolution, administrator enforcement, force-push or
 deletion settings, or no-overlap-on-main invariant changes.
 
-The effective state observed on 2026-08-18 was:
+The live state observed before this deferred activation on 2026-08-21 was:
 
 ```text
 main: protected
@@ -159,6 +174,7 @@ required_status_checks.contexts:
   - Owner approval
   - CodeQL analysis
   - Dependency review
+  # Codex review is intentionally absent until the post-merge update above.
 required_pull_request_reviews.dismiss_stale_reviews: true
 required_pull_request_reviews.require_last_push_approval: false
 required_pull_request_reviews.required_approving_review_count: 0
@@ -200,10 +216,8 @@ head with that missing required context is ineligible.
 The Owner approval event fixture tests cover the complementary non-live
 demonstration: missing, stale, edited, deleted, wrong-actor, prose, bot, and
 non-`main` approvals fail, while the exact canonical-owner command succeeds for
-the current head. A current valid approval plus all four passing required
-contexts is demonstrated by the authorized PR lifecycle for PR #46: before
-approval, the Owner check was non-successful and the PR was blocked; after the
-exact owner command, the current-head Owner check and all other required
-contexts passed. With latest-push approval deferred for the solo-maintainer
-phase, GitHub can evaluate that policy as merge-eligible without a normal human
-review record.
+the current head. The post-merge representative PR must demonstrate all five
+required contexts, with `Codex review` bound to app `15368`, before the live
+rule is considered active. With latest-push approval deferred for the
+solo-maintainer phase, GitHub can evaluate that policy as merge-eligible
+without a normal human review record.
