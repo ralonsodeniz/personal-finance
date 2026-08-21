@@ -170,7 +170,8 @@ function nativeArtifactBinding(artifact, source, parentReview) {
       : undefined;
   }
 
-  const associatedCommitSha = artifact.commit_id ?? parentReview?.commit_id;
+  const associatedCommitSha =
+    source === "review-comment" ? parentReview?.commit_id : artifact.commit_id;
 
   if (!isFullSha(associatedCommitSha)) {
     return undefined;
@@ -222,28 +223,60 @@ export function evaluateCodexReview({
   const activePullRequestReviews = pullRequestReviews.filter(
     (review) => !isDismissedPullRequestReview(review),
   );
-  const dismissedPullRequestReviewIds = new Set(
-    pullRequestReviews
-      .filter((review) => isDismissedPullRequestReview(review))
-      .map((review) => review.id)
-      .filter(isPositiveInteger)
-      .map(String),
-  );
-  const activePullRequestReviewComments = pullRequestReviewComments.filter(
-    (comment) => !dismissedPullRequestReviewIds.has(String(comment?.pull_request_review_id ?? "")),
-  );
+  const reviewsById = new Map();
+  const ambiguousReviewIds = new Set();
 
-  const reviewsById = new Map(
-    pullRequestReviews
-      .filter((review) => isPositiveInteger(review?.id))
-      .map((review) => [String(review.id), review]),
-  );
+  for (const review of pullRequestReviews) {
+    if (!isPositiveInteger(review?.id)) {
+      continue;
+    }
+
+    const reviewId = String(review.id);
+
+    if (reviewsById.has(reviewId)) {
+      ambiguousReviewIds.add(reviewId);
+    } else {
+      reviewsById.set(reviewId, review);
+    }
+  }
+
+  const trustedReviewComments = [];
+
+  for (const comment of pullRequestReviewComments) {
+    if (!isTrustedCodexReviewComment(comment)) {
+      continue;
+    }
+
+    const reviewId = String(comment?.pull_request_review_id ?? "");
+    const parentReview = reviewsById.get(reviewId);
+
+    if (
+      !isPositiveInteger(comment?.pull_request_review_id) ||
+      ambiguousReviewIds.has(reviewId) ||
+      !parentReview
+    ) {
+      return failureDecision(
+        currentHeadSha,
+        "A trusted native review comment could not be joined to exactly one parent review; retry is required.",
+      );
+    }
+
+    if (isDismissedPullRequestReview(parentReview)) {
+      continue;
+    }
+
+    if (!isTrustedCodexReviewComment(parentReview) || !isFullSha(parentReview.commit_id)) {
+      return failureDecision(
+        currentHeadSha,
+        "A trusted native review comment parent was malformed or unbound; retry is required.",
+      );
+    }
+
+    trustedReviewComments.push({ artifact: comment, parentReview });
+  }
+
   const nativeReviewCommentParentIds = new Set(
-    activePullRequestReviewComments
-      .filter((comment) => isTrustedCodexReviewComment(comment))
-      .map((comment) => comment.pull_request_review_id)
-      .filter(isPositiveInteger)
-      .map(String),
+    trustedReviewComments.map(({ parentReview }) => String(parentReview.id)),
   );
   const nativeIssueComments = comments.filter(
     (comment) =>
@@ -260,14 +293,12 @@ export function evaluateCodexReview({
           nativeReviewCommentParentIds.has(String(review.id))
         ),
     );
-  const nativeReviewComments = activePullRequestReviewComments
-    .filter((comment) => isTrustedCodexReviewComment(comment))
-    .map((comment) => ({
-      artifact: comment,
-      parentReview: reviewsById.get(String(comment.pull_request_review_id)),
-      source: "review-comment",
-      kind: hasNativeNoMajorResult(comment.body) ? "result" : "finding",
-    }));
+  const nativeReviewComments = trustedReviewComments.map(({ artifact, parentReview }) => ({
+    artifact,
+    parentReview,
+    source: "review-comment",
+    kind: hasNativeNoMajorResult(artifact.body) ? "result" : "finding",
+  }));
   const nativeArtifacts = [
     ...nativeIssueComments.map((comment) => ({
       artifact: comment,
