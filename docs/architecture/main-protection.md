@@ -216,8 +216,10 @@ head with that missing required context is ineligible.
 The Owner approval event fixture tests cover the complementary non-live
 demonstration: missing, stale, edited, deleted, wrong-actor, prose, bot, and
 non-`main` approvals fail, while the exact canonical-owner command succeeds for
-the current head. The post-merge representative PR must demonstrate all five
-required contexts, with `Codex review` bound to app `15368`, before the live
-rule is considered active. With latest-push approval deferred for the
-solo-maintainer phase, GitHub can evaluate that policy as merge-eligible
-without a normal human review record.
+the current head. The post-activation representative PR must be a normal,
+non-draft, docs-only change that demonstrates all five required contexts, with
+`Codex review` bound to app `15368`, before enforcement is reported complete.
+It must not change application behavior, dependencies, credentials, fixtures,
+or protection policy. With latest-push approval deferred for the solo-maintainer
+phase, GitHub can evaluate that policy as merge-eligible without a normal human
+review record.
