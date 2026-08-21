@@ -1,12 +1,15 @@
 import { spawnSync } from "node:child_process";
+import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 const repository = "ralonsodeniz/personal-finance";
 const defaultBranch = "main";
-const requiredContexts = [
+export const REQUIRED_CONTEXTS = [
   "Root quality gate",
   "Owner approval",
   "CodeQL analysis",
   "Dependency review",
+  "Codex review",
 ];
 
 function run(command, args) {
@@ -98,10 +101,10 @@ function verifyProtection() {
     "main must require pull requests.",
   );
   assert(statusChecks?.strict === true, "main must require a strictly up-to-date branch.");
-  assertSameItems(statusChecks.contexts, requiredContexts, "main required-check contexts changed");
+  assertSameItems(statusChecks.contexts, REQUIRED_CONTEXTS, "main required-check contexts changed");
   assertSameItems(
     statusChecks.checks?.map(({ context }) => context),
-    requiredContexts,
+    REQUIRED_CONTEXTS,
     "main structured required-check contexts changed",
   );
   assert(
@@ -189,11 +192,13 @@ function verifyNoOverlappingRulesets() {
   );
 }
 
-verifyAuthentication();
-verifyRepositoryIdentity();
-verifyProtection();
-verifyNoOverlappingRulesets();
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  verifyAuthentication();
+  verifyRepositoryIdentity();
+  verifyProtection();
+  verifyNoOverlappingRulesets();
 
-console.log(
-  `Authenticated main protection verification passed: one branch-protection rule, ${requiredContexts.length} required contexts, zero normal human approvals, no bypass actors, resolved conversations, administrator enforcement, and no force-push/deletion.`,
-);
+  console.log(
+    `Authenticated main protection verification passed: one branch-protection rule, ${REQUIRED_CONTEXTS.length} required contexts, zero normal human approvals, no bypass actors, resolved conversations, administrator enforcement, and no force-push/deletion.`,
+  );
+}

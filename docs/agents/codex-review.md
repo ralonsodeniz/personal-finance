@@ -47,6 +47,11 @@ The check is non-successful for:
 - an unavailable, timed-out, or otherwise unverifiable GitHub metadata/comments
   read.
 
+Each `gh api` response is bounded at 8 MiB before JSON parsing. Exceeding that
+bound is treated as an unavailable verification and publishes a non-successful
+current-head result; the workflow does not discard or partially trust an
+oversized response.
+
 A new commit is a new review boundary. The old result cannot authorize it. A
 fresh current-head result causes the `issue_comment` event to recompute the
 gate; historical stale comments are never used as the result for that new
@@ -65,6 +70,17 @@ to a write-capable secret.
 Its permissions are limited to `checks: write`, `contents: read`, `issues:
 read`, and `pull-requests: read`. It does not write comments, accept reactions,
 or alter the Root quality, CodeQL, Dependency review, or Owner approval gates.
+
+## Branch-protection sequencing
+
+The exact main-protection target includes `Root quality gate`, `Owner approval`,
+`CodeQL analysis`, `Dependency review`, and `Codex review`. Issue #51 does not
+mutate live main protection: the workflow must first be merged from `main` and
+produce a successful baseline `Codex review` result. Only then should an
+operator add `Codex review` to the live branch-protection rule and rerun
+`pnpm run protection:check`. Until that explicit control-plane step, the live
+rule may still expose its previous four-context baseline; the current pull
+request does not treat that missing live context as a passing check.
 
 ## Native-integration limitation and recovery
 

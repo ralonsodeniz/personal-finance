@@ -41,7 +41,9 @@ be updated as the managed Owner approval result.
 
 The workflow's internal job is named `Recompute current approval state`. It is
 a supporting, non-required implementation check; it is not an additional merge
-authority. The required merge context remains exactly `Owner approval`.
+authority. The required owner context remains exactly `Owner approval`; the
+separate `Codex review` context covers code-review evidence and never grants
+release authorization.
 
 ## Operator merge sequence
 
@@ -49,16 +51,17 @@ For a pull request targeting `main`, use this order:
 
 1. Review the current pull-request diff and confirm the target is `main`.
 2. Wait for every non-Owner required context to pass for the current head:
-   `Root quality gate`, `CodeQL analysis`, and `Dependency review`.
+   `Root quality gate`, `CodeQL analysis`, `Dependency review`, and `Codex
+review`.
 3. Re-fetch the check state and verify the exact required-context set is
-   `Root quality gate`, `Owner approval`, `CodeQL analysis`, and
-   `Dependency review`. Confirm that `Owner approval` is the only remaining
-   blocker; do not count the supporting `Recompute current approval state`
-   job as a second required context.
+   `Root quality gate`, `Owner approval`, `CodeQL analysis`, `Dependency
+review`, and `Codex review`. Confirm that `Owner approval` is the only
+   remaining blocker; do not count the supporting `Recompute current approval
+state` job as a second required context.
 4. Post a new comment whose complete body is exactly `/owner-approve`.
 5. Re-fetch the current head SHA, approval comment, check runs, and pull-request
    merge state. Do not rely on a cached check result or an older head.
-6. Merge only when all four required contexts pass for the current head and
+6. Merge only when all five required contexts pass for the current head and
    GitHub reports `mergeStateStatus: CLEAN` (the clean merge state).
 
 For example, the final read-only state check is:

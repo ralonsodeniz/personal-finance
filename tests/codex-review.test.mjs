@@ -14,6 +14,7 @@ import {
   TRUSTED_GITHUB_ACTIONS_APP_NAME,
   TRUSTED_GITHUB_ACTIONS_APP_SLUG,
   CODEX_USER_TYPE,
+  GH_API_MAX_BUFFER,
   buildCodexReviewCheckPayload,
   evaluateCodexReview,
   flattenCheckRunPages,
@@ -24,6 +25,7 @@ import {
   isTrustedCodexReviewComment,
   parseCodexReviewResult,
 } from "../scripts/codex-review.mjs";
+import { REQUIRED_CONTEXTS } from "../scripts/verify-main-protection.mjs";
 
 const currentHeadSha = "a".repeat(40);
 const previousHeadSha = "b".repeat(40);
@@ -32,8 +34,14 @@ const publicCodexUserId = 267193182;
 const workflowPath = fileURLToPath(
   new URL("../.github/workflows/codex-review.yml", import.meta.url),
 );
+const codexReviewScriptPath = fileURLToPath(
+  new URL("../scripts/codex-review.mjs", import.meta.url),
+);
 const documentationPath = fileURLToPath(new URL("../docs/agents/codex-review.md", import.meta.url));
 const rootAgentsPath = fileURLToPath(new URL("../AGENTS.md", import.meta.url));
+const protectionDocumentationPath = fileURLToPath(
+  new URL("../docs/architecture/main-protection.md", import.meta.url),
+);
 
 const trustedGitHubActionsApp = {
   id: TRUSTED_GITHUB_ACTIONS_APP_ID,
@@ -243,6 +251,11 @@ describe("Codex review protocol", () => {
     );
   });
 
+  it("bounds paginated GitHub API output before parsing it", () => {
+    expect(GH_API_MAX_BUFFER).toBe(8 * 1024 * 1024);
+    expect(readFileSync(codexReviewScriptPath, "utf8")).toContain("maxBuffer: GH_API_MAX_BUFFER");
+  });
+
   it("fails duplicate or conflicting current-head results", () => {
     expect(decisionFor([codexComment(), codexComment({ id: 402 })]).conclusion).toBe("failure");
     expect(
@@ -358,5 +371,20 @@ describe("Codex review protocol", () => {
     expect(rootAgents).toContain("Reviewed head SHA:");
     expect(rootAgents).toContain("Result: PASS");
     expect(rootAgents).toContain("Result: CHANGES_REQUESTED");
+  });
+
+  it("targets Codex review in the exact protection policy and defers live activation", () => {
+    expect(REQUIRED_CONTEXTS).toEqual([
+      "Root quality gate",
+      "Owner approval",
+      "CodeQL analysis",
+      "Dependency review",
+      "Codex review",
+    ]);
+
+    const protectionDocumentation = readFileSync(protectionDocumentationPath, "utf8");
+    expect(protectionDocumentation).toContain("Codex review");
+    expect(protectionDocumentation).toContain("successful baseline");
+    expect(protectionDocumentation).toContain("does not mutate live main protection");
   });
 });
