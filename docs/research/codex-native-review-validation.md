@@ -5,3 +5,5 @@ native Codex GitHub review integration. It is intentionally not product or
 architecture work and should not be merged.
 
 This second harmless commit validates the configured follow-up review trigger.
+
+This final harmless commit checks the trigger after the prior review completed.
