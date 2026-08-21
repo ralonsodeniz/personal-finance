@@ -1,7 +1,8 @@
 # Native Codex review status gate
 
 The `Codex review` check is a fail-closed compatibility bridge around the
-native Codex GitHub integration. It observes the native Codex final comment and
+native Codex GitHub integration. It observes native Codex final results in
+issue comments, pull-request review bodies, and inline review comments, then
 publishes a stable status check for the exact current pull-request head. It is
 code-review evidence; `/owner-approve` remains the repository owner's separate
 release authorization.
@@ -44,8 +45,8 @@ The check is non-successful for:
 - a stale result for an older head;
 - duplicate or conflicting results for the current head;
 - `CHANGES_REQUESTED`; or
-- an unavailable, timed-out, or otherwise unverifiable GitHub metadata/comments
-  read.
+- an unavailable, timed-out, or otherwise unverifiable GitHub
+  metadata/comments/reviews read.
 
 Each `gh api` response is bounded at 8 MiB before JSON parsing. Exceeding that
 bound is treated as an unavailable verification and publishes a non-successful
@@ -53,16 +54,19 @@ current-head result; the workflow does not discard or partially trust an
 oversized response.
 
 A new commit is a new review boundary. The old result cannot authorize it. A
-fresh current-head result causes the `issue_comment` event to recompute the
-gate; historical stale comments are never used as the result for that new
-head.
+fresh current-head result causes its native review event or the `issue_comment`
+event to recompute the gate; historical stale comments are never used as the
+result for that new head.
 
 ## Workflow security boundary
 
-The workflow recomputes on pull-request lifecycle events and issue-comment
-create/edit/delete events. It uses `pull_request_target` only to read GitHub
-metadata/comments and publish a check. It checks out `main` explicitly and
-executes only the trusted `scripts/codex-review.mjs` from that checkout. It
+The workflow recomputes on pull-request lifecycle events, issue-comment
+create/edit/delete events, `pull_request_review` submitted/edited/dismissed
+events, and `pull_request_review_comment` created/edited/deleted events. It
+uses `pull_request_target` only to read GitHub metadata and the three native
+review sources (`issues/{number}/comments`, `pulls/{number}/reviews`, and
+`pulls/{number}/comments`) and publish a check. It checks out `main` explicitly
+and executes only the trusted `scripts/codex-review.mjs` from that checkout. It
 does not check out or execute pull-request code, install dependencies, use
 `OPENAI_API_KEY`, use the API-key `codex-action`, or pass pull-request content
 to a write-capable secret.
@@ -98,13 +102,14 @@ When `Codex review` is pending or failing:
    full head SHA.
 2. Request a fresh native review with `@codex review`; do not manufacture a
    passing comment or rely on a reaction.
-3. Confirm the native comment ends with the exact protocol block for that
-   current SHA and an explicit `Result: PASS`.
-4. Wait for the issue-comment workflow to recompute `Codex review`. If the
-   integration or GitHub metadata/comments API remains unavailable, the
-   workflow publishes a non-successful gate when a verifiable current head is
-   available and exits non-successful after reporting the verification error.
-   An issue-comment payload may not contain a head SHA, so the workflow cannot
+3. Confirm the native review body or inline review comment ends with the exact
+   protocol block for that current SHA and an explicit `Result: PASS`.
+4. Wait for the matching native review event or the issue-comment workflow to
+   recompute `Codex review`. If the integration or GitHub metadata, issue
+   comments, review, or review-comment API remains unavailable, the workflow
+   publishes a non-successful gate when a verifiable current head is available
+   and exits non-successful after reporting the verification error. An
+   issue-comment payload may not contain a head SHA, so the workflow cannot
    safely invent one; in that case it fails the supporting run without
    refreshing a prior head-bound check. Treat that failed run as requiring a
    retry, never as a passing recomputation.

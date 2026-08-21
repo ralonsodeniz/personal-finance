@@ -19,6 +19,8 @@ import {
   evaluateCodexReview,
   flattenCheckRunPages,
   flattenIssueCommentPages,
+  flattenPullRequestReviewCommentPages,
+  flattenPullRequestReviewPages,
   getEventHeadSha,
   getEventPullRequestNumber,
   isManagedCodexReviewCheckRun,
@@ -60,6 +62,14 @@ function codexComment(overrides = {}) {
     user: { id: CODEX_USER_ID, login: CODEX_LOGIN, type: CODEX_USER_TYPE },
     ...overrides,
   };
+}
+
+function nativePullRequestReview(overrides = {}) {
+  return codexComment({ id: 501, ...overrides });
+}
+
+function nativePullRequestReviewComment(overrides = {}) {
+  return codexComment({ id: 502, ...overrides });
 }
 
 function pullRequest(overrides = {}) {
@@ -149,6 +159,38 @@ describe("Codex review protocol", () => {
     });
   });
 
+  it("evaluates native pull-request review bodies as Codex evidence", () => {
+    const decision = evaluateCodexReview({
+      comments: [],
+      pullRequestReviews: [nativePullRequestReview()],
+      pullRequestReviewComments: [],
+      pullRequest: pullRequest(),
+    });
+
+    expect(decision).toMatchObject({
+      conclusion: "success",
+      headSha: currentHeadSha,
+      result: "PASS",
+      resultCommentId: "501",
+    });
+  });
+
+  it("combines issue comments and inline review comments at the current-head boundary", () => {
+    const decision = evaluateCodexReview({
+      comments: [codexComment({ id: 503, body: reviewBody(previousHeadSha, "PASS") })],
+      pullRequestReviews: [nativePullRequestReview({ body: "Native review summary" })],
+      pullRequestReviewComments: [nativePullRequestReviewComment()],
+      pullRequest: pullRequest(),
+    });
+
+    expect(decision).toMatchObject({
+      conclusion: "success",
+      headSha: currentHeadSha,
+      result: "PASS",
+      resultCommentId: "502",
+    });
+  });
+
   it("fails for missing, unavailable, changes-requested, and reaction-only states", () => {
     expect(GH_API_TIMEOUT_MS).toBe(30_000);
     expect(decisionFor([]).conclusion).toBe("failure");
@@ -162,6 +204,14 @@ describe("Codex review protocol", () => {
     expect(evaluateCodexReview({ comments: null, pullRequest: pullRequest() }).conclusion).toBe(
       "failure",
     );
+    expect(
+      evaluateCodexReview({
+        comments: [],
+        pullRequestReviews: null,
+        pullRequestReviewComments: [],
+        pullRequest: pullRequest(),
+      }).conclusion,
+    ).toBe("failure");
     expect(
       decisionFor([codexComment({ body: reviewBody(currentHeadSha, "CHANGES_REQUESTED") })])
         .conclusion,
@@ -205,10 +255,13 @@ describe("Codex review protocol", () => {
     ).toBe("success");
   });
 
-  it("routes pull-request and issue-comment events through the same recomputation seam", () => {
+  it("routes pull-request, review, and issue-comment events through the same recomputation seam", () => {
     expect(getEventPullRequestNumber("pull_request_target", { pull_request: { number: 51 } })).toBe(
       51,
     );
+    for (const eventName of ["pull_request_review", "pull_request_review_comment"]) {
+      expect(getEventPullRequestNumber(eventName, { pull_request: { number: 51 } })).toBe(51);
+    }
     expect(
       getEventPullRequestNumber("issue_comment", {
         issue: { number: 51, pull_request: { url: "https://api.github.com/pulls/51" } },
@@ -249,6 +302,16 @@ describe("Codex review protocol", () => {
     expect(() => flattenCheckRunPages([{ check_runs: [] }, []])).toThrow(
       "malformed check-run pages",
     );
+    expect(flattenPullRequestReviewPages([[nativePullRequestReview()]])).toHaveLength(1);
+    expect(flattenPullRequestReviewCommentPages([[nativePullRequestReviewComment()]])).toHaveLength(
+      1,
+    );
+    expect(() => flattenPullRequestReviewPages([[nativePullRequestReview()], {}])).toThrow(
+      "malformed pull-request review pages",
+    );
+    expect(() =>
+      flattenPullRequestReviewCommentPages([[nativePullRequestReviewComment()], {}]),
+    ).toThrow("malformed pull-request review-comment pages");
   });
 
   it("bounds paginated GitHub API output before parsing it", () => {
@@ -340,6 +403,10 @@ describe("Codex review protocol", () => {
 
     expect(workflow).toContain("pull_request_target:");
     expect(workflow).toContain("issue_comment:");
+    expect(workflow).toContain("pull_request_review:");
+    expect(workflow).toContain("pull_request_review_comment:");
+    expect(workflow).toContain("github.event_name == 'pull_request_review'");
+    expect(workflow).toContain("github.event_name == 'pull_request_review_comment'");
     expect(workflow).toContain("checks: write");
     expect(workflow).toContain("contents: read");
     expect(workflow).toContain("issues: read");

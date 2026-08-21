@@ -87,6 +87,8 @@ assertAllIncludes(
     "name: Codex review",
     "pull_request_target:",
     "issue_comment:",
+    "pull_request_review:",
+    "pull_request_review_comment:",
     "checks: write",
     "contents: read",
     "issues: read",
