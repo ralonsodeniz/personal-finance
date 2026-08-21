@@ -1,13 +1,32 @@
 import { spawnSync } from "node:child_process";
+import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 const repository = "ralonsodeniz/personal-finance";
 const defaultBranch = "main";
-const requiredContexts = [
+export const TRUSTED_GITHUB_ACTIONS_APP_ID = 15368;
+export const REQUIRED_CONTEXTS = [
   "Root quality gate",
   "Owner approval",
   "CodeQL analysis",
   "Dependency review",
+  "Codex review",
 ];
+export const REQUIRED_CHECK_BINDINGS = [
+  { context: "Codex review", app_id: TRUSTED_GITHUB_ACTIONS_APP_ID },
+];
+
+export function hasExpectedCodexReviewBinding(checks) {
+  if (!Array.isArray(checks)) {
+    return false;
+  }
+
+  const codexBindings = checks
+    .filter(({ context }) => context === "Codex review")
+    .map(({ context, app_id }) => ({ context, app_id }));
+
+  return JSON.stringify(codexBindings) === JSON.stringify(REQUIRED_CHECK_BINDINGS);
+}
 
 function run(command, args) {
   const result = spawnSync(command, args, {
@@ -98,11 +117,15 @@ function verifyProtection() {
     "main must require pull requests.",
   );
   assert(statusChecks?.strict === true, "main must require a strictly up-to-date branch.");
-  assertSameItems(statusChecks.contexts, requiredContexts, "main required-check contexts changed");
+  assertSameItems(statusChecks.contexts, REQUIRED_CONTEXTS, "main required-check contexts changed");
   assertSameItems(
     statusChecks.checks?.map(({ context }) => context),
-    requiredContexts,
+    REQUIRED_CONTEXTS,
     "main structured required-check contexts changed",
+  );
+  assert(
+    hasExpectedCodexReviewBinding(statusChecks.checks),
+    "main Codex review publisher binding changed",
   );
   assert(
     protection.enforce_admins?.enabled === true,
@@ -189,11 +212,13 @@ function verifyNoOverlappingRulesets() {
   );
 }
 
-verifyAuthentication();
-verifyRepositoryIdentity();
-verifyProtection();
-verifyNoOverlappingRulesets();
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  verifyAuthentication();
+  verifyRepositoryIdentity();
+  verifyProtection();
+  verifyNoOverlappingRulesets();
 
-console.log(
-  `Authenticated main protection verification passed: one branch-protection rule, ${requiredContexts.length} required contexts, zero normal human approvals, no bypass actors, resolved conversations, administrator enforcement, and no force-push/deletion.`,
-);
+  console.log(
+    `Authenticated main protection verification passed: one branch-protection rule, ${REQUIRED_CONTEXTS.length} required contexts, Codex review bound to GitHub Actions app ${TRUSTED_GITHUB_ACTIONS_APP_ID}, zero normal human approvals, no bypass actors, resolved conversations, administrator enforcement, and no force-push/deletion.`,
+  );
+}

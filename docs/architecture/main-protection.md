@@ -13,10 +13,11 @@ A change to `main` is eligible only when all of these conditions hold:
 1. The change arrives through a pull request targeting `main`; direct pushes
    are not a merge path.
 2. The pull-request head is up to date with `main`.
-3. These four stable check contexts are successful for the current head:
-   `Root quality gate`, `Owner approval`, `CodeQL analysis`, and
-   `Dependency review`. These are the check-run names exposed by GitHub; the
-   workflow names are metadata and are not part of the required context.
+3. These five stable check contexts are successful for the current head:
+   `Root quality gate`, `Owner approval`, `CodeQL analysis`, `Dependency
+review`, and `Codex review`. These are the check-run names exposed by
+   GitHub; the workflow names are metadata and are not part of the required
+   context.
 4. Every review conversation is resolved.
 5. The pull request has zero required normal human approvals for the current
    solo-maintainer phase. The separate `Owner approval` check is the explicit
@@ -37,7 +38,14 @@ verify an independent approval of the newest head. `require_code_owner_reviews`
 is false because no CODEOWNERS policy is in scope and the owner check is not a
 substitute for a future independent human reviewer.
 
-AI review integrations remain advisory and are not required status checks.
+Other AI review integrations remain advisory. The native Codex bridge is the
+explicit issue #51 exception and is a required code-review context once its
+control-plane activation is complete.
+It is triggered by one standalone `@codex review` request for the exact head
+and consumes the trusted native issue comment, review, and review-comment
+artifacts. The full GitHub `commit_id` or current PR metadata binds the result;
+the abbreviated `Reviewed commit` text is only a consistency check. Active
+findings and reactions never grant release authorization.
 Secret scanning, push protection, Dependabot security alerts/security updates,
 CodeQL, dependency review, and the Owner approval workflow are configured by
 the prerequisite issues and remain independent deterministic controls.
@@ -45,7 +53,25 @@ the prerequisite issues and remain independent deterministic controls.
 `Owner approval` is release authorization, not code review. The workflow's
 internal job is named `Recompute current approval state`; that supporting job
 is not an additional required context or merge authority. The required context
-remains exactly `Owner approval`.
+remains exactly `Owner approval`; `Codex review` is a separate review context
+and never grants release authorization.
+
+The verifier's exact required-context target includes `Codex review`. This issue
+does not mutate live main protection: until this workflow is merged from `main`
+and a successful baseline `Codex review` check is observed, live `main` may still
+expose the previous four-context set. After that successful baseline, explicitly
+add `Codex review` to the live branch-protection rule and rerun
+`pnpm run protection:check`. The current pull request does not run that live
+control-plane assertion, so the deferred mutation does not self-block this
+implementation. The trusted-main bootstrap is complete: merged PR #53 added the
+workflow to `main`, and merged PR #54 added the parent-review-bound evaluator.
+The current bridge still checks out trusted `main` and never executes
+pull-request code. Any earlier `MODULE_NOT_FOUND` run is historical bootstrap
+evidence, not a current blocker or a passing Codex result.
+The structured branch-protection entry for `Codex review` must also carry
+`app_id: 15368` for the GitHub Actions app. A null or different publisher
+binding fails the verifier; this binding is part of the same deferred
+post-bootstrap control-plane update.
 
 ## Operator merge sequence
 
@@ -54,17 +80,18 @@ For each pull request, follow this order against the current GitHub state:
 1. Review the current pull-request diff and confirm that the target branch is
    `main`.
 2. Wait for all non-Owner required contexts to pass for the current head:
-   `Root quality gate`, `CodeQL analysis`, and `Dependency review`.
+   `Root quality gate`, `CodeQL analysis`, `Dependency review`, and `Codex
+review`.
 3. Re-fetch the checks and verify the exact required-context names are
-   `Root quality gate`, `Owner approval`, `CodeQL analysis`, and
-   `Dependency review`. Confirm that the only remaining blocker is `Owner
-approval`; the supporting `Recompute current approval state` job does not
-   add another required merge authority.
+   `Root quality gate`, `Owner approval`, `CodeQL analysis`, `Dependency
+review`, and `Codex review`. Confirm that the only remaining blocker is
+   `Owner approval`; the supporting `Recompute current approval state` job does
+   not add another required merge authority.
 4. Post a comment whose complete body is exactly `/owner-approve` as the
    canonical owner.
 5. Re-fetch the current head SHA, exact approval comment ID, check results, and
    pull-request merge state after the workflow recomputes authorization.
-6. Merge only when all four required contexts pass for that current head and
+6. Merge only when all five required contexts pass for that current head and
    GitHub reports `mergeState is clean` (`mergeStateStatus: CLEAN`).
 
 The final read-only inspection can use:
@@ -83,13 +110,14 @@ After any new commit is pushed to a pull-request branch:
    result for the new full head SHA. An approval for the previous head is not
    reusable.
 3. Wait for the non-Owner required contexts to pass, then verify the exact
-   required-context set and that Owner approval is the only remaining blocker.
+   five-context set and that Owner approval is the only remaining blocker.
 4. Add a comment whose complete body is exactly `/owner-approve` as the
    canonical owner `ralonsodeniz` (immutable user ID `28633982`).
 5. Re-fetch the current state. Confirm that `Owner approval` is successful for
    the new head SHA and that
-   the Root quality gate, CodeQL analysis, and dependency review contexts are
-   also successful, then merge only when `mergeStateStatus` is `CLEAN`.
+   the Root quality gate, CodeQL analysis, dependency review, and Codex review
+   contexts are also successful, then merge only when `mergeStateStatus` is
+   `CLEAN`.
 
 When normal human approvals are later enabled, update the protection rule to
 set `require_last_push_approval: true` and obtain an independent approval for
