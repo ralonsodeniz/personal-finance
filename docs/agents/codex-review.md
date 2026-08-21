@@ -20,14 +20,19 @@ The bridge reads these trusted native surfaces:
 issues.` and containing a `Reviewed commit` line;
 - pull-request reviews, whose full `commit_id` binds the review to a head; and
 - pull-request review comments, whose full `commit_id` and
-  `pull_request_review_id` identify the reviewed head and parent review.
+  `pull_request_review_id` identify the reviewed head and parent review. A
+  review comment beginning `Codex Review: Didn't find any major issues.` is a
+  final result; its full `commit_id` is authoritative and the abbreviated
+  `Reviewed commit` line is optional.
 
 The full `commit_id` or current pull-request metadata is authoritative. The
 abbreviated value in `Reviewed commit: \`<prefix>\`` is only a consistency
 check against that full head. A missing, ambiguous, malformed, or conflicting
 binding is not evidence. The generic native review envelope is not itself a
-PASS; an active current-head review body that is not a recognized final result,
-or an inline finding, is a failing review artifact.
+PASS. When that envelope has trusted child review comments, those child
+artifacts determine the result; otherwise an active current-head review body
+that is not a recognized final result, or an inline finding, is a failing review
+artifact.
 
 The bridge trusts the observed native publisher identity
 `chatgpt-codex-connector[bot]`, whose immutable GitHub user ID is `199175422`

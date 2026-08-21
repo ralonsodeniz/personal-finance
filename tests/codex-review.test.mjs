@@ -343,6 +343,81 @@ describe("Codex review protocol", () => {
     });
   });
 
+  it("accepts a native no-major result published as a current-head review comment", () => {
+    const decision = evaluateCodexReview({
+      comments: [],
+      pullRequestReviews: [],
+      pullRequestReviewComments: [
+        nativePullRequestReviewComment({
+          body: NATIVE_CODEX_NO_MAJOR_PREFIX,
+          id: 505,
+        }),
+      ],
+      pullRequest: pullRequest(),
+    });
+
+    expect(decision).toMatchObject({
+      conclusion: "success",
+      headSha: currentHeadSha,
+      result: "PASS",
+      resultCommentId: "505",
+    });
+  });
+
+  it("does not let the native review envelope block its result comment", () => {
+    const decision = evaluateCodexReview({
+      comments: [],
+      pullRequestReviews: [
+        nativePullRequestReview({
+          id: 601,
+          body: "\n### 💡 Codex Review\n\nHere are some automated review suggestions for this pull request.",
+        }),
+      ],
+      pullRequestReviewComments: [
+        nativePullRequestReviewComment({
+          body: NATIVE_CODEX_NO_MAJOR_PREFIX,
+          id: 602,
+          pull_request_review_id: 601,
+        }),
+      ],
+      pullRequest: pullRequest(),
+    });
+
+    expect(decision).toMatchObject({
+      conclusion: "success",
+      headSha: currentHeadSha,
+      result: "PASS",
+      resultCommentId: "602",
+    });
+  });
+
+  it("keeps a changes-requested native review envelope blocking", () => {
+    const decision = evaluateCodexReview({
+      comments: [],
+      pullRequestReviews: [
+        nativePullRequestReview({
+          id: 603,
+          body: "\n### 💡 Codex Review\n\nHere are some automated review suggestions for this pull request.",
+          state: "CHANGES_REQUESTED",
+        }),
+      ],
+      pullRequestReviewComments: [
+        nativePullRequestReviewComment({
+          body: NATIVE_CODEX_NO_MAJOR_PREFIX,
+          id: 604,
+          pull_request_review_id: 603,
+        }),
+      ],
+      pullRequest: pullRequest(),
+    });
+
+    expect(decision).toMatchObject({
+      conclusion: "failure",
+      result: "CHANGES_REQUESTED",
+      resultCommentId: "603",
+    });
+  });
+
   it("rejects an active current-head native inline finding", () => {
     const decision = evaluateCodexReview({
       comments: [codexComment()],
