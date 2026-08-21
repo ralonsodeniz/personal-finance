@@ -15,6 +15,7 @@ import {
   TRUSTED_GITHUB_ACTIONS_APP_SLUG,
   CODEX_USER_TYPE,
   GH_API_MAX_BUFFER,
+  MAX_PUBLICATION_RECONCILIATIONS,
   buildCodexReviewCheckPayload,
   evaluateCodexReview,
   flattenCheckRunPages,
@@ -24,6 +25,9 @@ import {
   getFallbackHeadSha,
   getEventHeadSha,
   getEventPullRequestNumber,
+  isCodexReviewPublicationCurrent,
+  isCurrentReviewDelivery,
+  isManagedCodexReviewCheckCurrent,
   isManagedCodexReviewCheckRun,
   isTrustedCodexReviewComment,
   parseCodexReviewResult,
@@ -670,6 +674,274 @@ describe("Codex review protocol", () => {
     expect(getFallbackHeadSha(issueCommentEvent, [[{ sha: currentHeadSha }]])).toBeUndefined();
   });
 
+  it("does not let a superseded review delivery overwrite a newer decision", () => {
+    const earlierReview = {
+      id: 501,
+      submitted_at: "2026-08-21T19:39:58Z",
+    };
+    const laterComment = {
+      id: 502,
+      created_at: "2026-08-21T19:39:59Z",
+    };
+
+    expect(
+      isCurrentReviewDelivery({
+        event: { review: earlierReview },
+        eventName: "pull_request_review",
+        pullRequestReviewComments: [laterComment],
+        pullRequestReviews: [earlierReview],
+      }),
+    ).toBe(false);
+    expect(
+      isCurrentReviewDelivery({
+        event: { comment: laterComment },
+        eventName: "pull_request_review_comment",
+        pullRequestReviewComments: [laterComment],
+        pullRequestReviews: [earlierReview],
+      }),
+    ).toBe(true);
+  });
+
+  it("detects an out-of-order publication after a newer review finding arrives", () => {
+    const earlierReview = {
+      id: 501,
+      submitted_at: "2026-08-21T19:39:58Z",
+    };
+    const laterComment = {
+      id: 502,
+      created_at: "2026-08-21T19:39:59Z",
+    };
+    const publishedPass = {
+      conclusion: "success",
+      headSha: currentHeadSha,
+      reason: "The trusted native Codex review passed for this exact current head.",
+      result: "PASS",
+      resultCommentId: "601",
+    };
+    const currentFailure = {
+      conclusion: "failure",
+      headSha: currentHeadSha,
+      reason: "Active native Codex findings or changes requested exist for this current head.",
+      result: "CHANGES_REQUESTED",
+      resultCommentId: "502",
+    };
+
+    expect(MAX_PUBLICATION_RECONCILIATIONS).toBe(2);
+    expect(
+      isCodexReviewPublicationCurrent({
+        currentDecision: currentFailure,
+        event: { review: earlierReview },
+        eventName: "pull_request_review",
+        publishedDecision: publishedPass,
+        pullRequestReviewComments: [laterComment],
+        pullRequestReviews: [earlierReview],
+      }),
+    ).toBe(false);
+  });
+
+  it("requires the managed check run to match the authoritative decision", () => {
+    const decision = {
+      conclusion: "failure",
+      headSha: currentHeadSha,
+      reason: "Active native Codex findings or changes requested exist for this current head.",
+      result: "CHANGES_REQUESTED",
+      resultCommentId: "502",
+    };
+    const payload = buildCodexReviewCheckPayload({ decision });
+    const managedCheckRun = {
+      app: trustedGitHubActionsApp,
+      conclusion: payload.conclusion,
+      head_sha: currentHeadSha,
+      id: 801,
+      name: CODEX_REVIEW_CHECK_NAME,
+      output: payload.output,
+      started_at: "2026-08-21T19:39:58Z",
+      status: "completed",
+    };
+
+    expect(isManagedCodexReviewCheckCurrent([managedCheckRun], decision)).toBe(true);
+    expect(
+      isManagedCodexReviewCheckCurrent(
+        [
+          {
+            ...managedCheckRun,
+            output: {
+              ...managedCheckRun.output,
+              text: managedCheckRun.output.text.replace("Decision: failure", "Decision: success"),
+            },
+          },
+        ],
+        decision,
+      ),
+    ).toBe(false);
+    const conflictingPayload = buildCodexReviewCheckPayload({
+      decision: {
+        conclusion: "success",
+        headSha: currentHeadSha,
+        reason: "The trusted native Codex review passed for this exact head.",
+        result: "PASS",
+        resultCommentId: "503",
+      },
+    });
+    expect(
+      isManagedCodexReviewCheckCurrent(
+        [
+          managedCheckRun,
+          {
+            ...managedCheckRun,
+            conclusion: conflictingPayload.conclusion,
+            id: 802,
+            output: conflictingPayload.output,
+          },
+        ],
+        decision,
+      ),
+    ).toBe(false);
+    expect(isManagedCodexReviewCheckCurrent([], decision)).toBe(false);
+  });
+
+  it("accepts an adopted newer snapshot without the original delivery freshness fence", () => {
+    const decision = {
+      conclusion: "failure",
+      headSha: currentHeadSha,
+      reason: "Active native Codex findings or changes requested exist for this current head.",
+      result: "CHANGES_REQUESTED",
+      resultCommentId: "502",
+    };
+    const payload = buildCodexReviewCheckPayload({ decision });
+    const managedCheckRun = {
+      app: trustedGitHubActionsApp,
+      conclusion: payload.conclusion,
+      head_sha: currentHeadSha,
+      id: 802,
+      name: CODEX_REVIEW_CHECK_NAME,
+      output: payload.output,
+      started_at: "2026-08-21T19:39:58Z",
+      status: "completed",
+    };
+
+    expect(
+      isCodexReviewPublicationCurrent({
+        currentCheckRuns: [managedCheckRun],
+        currentDecision: decision,
+        event: undefined,
+        eventName: undefined,
+        publishedDecision: decision,
+        pullRequestReviewComments: [],
+        pullRequestReviews: [],
+      }),
+    ).toBe(true);
+  });
+
+  it("treats a review dismissal as current despite its original review timestamp", () => {
+    const dismissedReview = {
+      id: 501,
+      state: "DISMISSED",
+      submitted_at: "2026-08-21T19:39:58Z",
+    };
+    const laterReviewComment = {
+      id: 502,
+      created_at: "2026-08-21T19:39:59Z",
+    };
+
+    expect(
+      isCurrentReviewDelivery({
+        event: { action: "dismissed", review: dismissedReview },
+        eventName: "pull_request_review",
+        pullRequestReviewComments: [laterReviewComment],
+        pullRequestReviews: [dismissedReview],
+      }),
+    ).toBe(true);
+  });
+
+  it("treats a review-comment deletion as current despite its original comment timestamp", () => {
+    const deletedComment = {
+      id: 502,
+      created_at: "2026-08-21T19:39:58Z",
+    };
+    const laterReview = {
+      id: 503,
+      submitted_at: "2026-08-21T19:39:59Z",
+    };
+
+    expect(
+      isCurrentReviewDelivery({
+        event: { action: "deleted", comment: deletedComment },
+        eventName: "pull_request_review_comment",
+        pullRequestReviewComments: [laterReview],
+        pullRequestReviews: [],
+      }),
+    ).toBe(true);
+  });
+
+  it("treats a review-comment edit as current despite its original comment timestamp", () => {
+    const editedComment = {
+      id: 503,
+      created_at: "2026-08-21T19:39:58Z",
+    };
+    const laterReview = {
+      id: 504,
+      submitted_at: "2026-08-21T19:39:59Z",
+    };
+
+    expect(
+      isCurrentReviewDelivery({
+        event: { action: "edited", comment: editedComment },
+        eventName: "pull_request_review_comment",
+        pullRequestReviewComments: [laterReview],
+        pullRequestReviews: [],
+      }),
+    ).toBe(true);
+  });
+
+  it("treats a review edit as current despite its original review timestamp", () => {
+    const editedReview = {
+      id: 503,
+      submitted_at: "2026-08-21T19:39:58Z",
+    };
+    const laterReviewComment = {
+      id: 504,
+      created_at: "2026-08-21T19:39:59Z",
+    };
+
+    expect(
+      isCurrentReviewDelivery({
+        event: { action: "edited", review: editedReview },
+        eventName: "pull_request_review",
+        pullRequestReviewComments: [laterReviewComment],
+        pullRequestReviews: [editedReview],
+      }),
+    ).toBe(true);
+  });
+
+  it("treats cross-surface timestamp ties as current", () => {
+    const review = {
+      id: 505,
+      submitted_at: "2026-08-21T19:39:58Z",
+    };
+    const reviewComment = {
+      id: 506,
+      created_at: "2026-08-21T19:39:58Z",
+    };
+
+    expect(
+      isCurrentReviewDelivery({
+        event: { review },
+        eventName: "pull_request_review",
+        pullRequestReviewComments: [reviewComment],
+        pullRequestReviews: [review],
+      }),
+    ).toBe(true);
+    expect(
+      isCurrentReviewDelivery({
+        event: { comment: reviewComment },
+        eventName: "pull_request_review_comment",
+        pullRequestReviewComments: [reviewComment],
+        pullRequestReviews: [review],
+      }),
+    ).toBe(true);
+  });
+
   it("rejects malformed GitHub pagination instead of discarding it", () => {
     expect(flattenIssueCommentPages([[codexComment()]])).toHaveLength(1);
     expect(() => flattenIssueCommentPages([[codexComment()], { body: "unexpected" }])).toThrow(
@@ -698,7 +970,14 @@ describe("Codex review protocol", () => {
 
   it("fails duplicate or conflicting current-head results", () => {
     expect(decisionFor([codexComment(), codexComment({ id: 402 })]).conclusion).toBe("failure");
-    expect(decisionFor([codexComment(), codexComment({ id: 402 })]).conclusion).toBe("failure");
+    expect(
+      evaluateCodexReview({
+        comments: [codexComment()],
+        pullRequestReviews: [nativePullRequestReview({ id: 403 })],
+        pullRequestReviewComments: [],
+        pullRequest: pullRequest(),
+      }).conclusion,
+    ).toBe("failure");
     expect(
       evaluateCodexReview({
         comments: [codexComment()],
@@ -861,5 +1140,75 @@ describe("Codex review protocol", () => {
     expect(protectionDocumentation).not.toContain("origin/main does not yet contain");
     expect(protectionDocumentation).toContain("successful baseline");
     expect(protectionDocumentation).toContain("does not mutate live main protection");
+  });
+
+  it("uses supported non-canceling concurrency for review recomputations", () => {
+    const workflow = readFileSync(workflowPath, "utf8");
+    const concurrencyGroup = workflow.match(
+      /concurrency:\n\s+group:\s+>-\n([\s\S]*?)\n\s+cancel-in-progress:/,
+    )?.[1];
+
+    expect(workflow).toContain("pull_request_review:");
+    expect(workflow).toContain("pull_request_review_comment:");
+    expect(workflow).toMatch(/concurrency:[\s\S]*?cancel-in-progress: false/);
+    expect(concurrencyGroup).toContain(
+      "github.event_name == 'pull_request_review' && github.run_id",
+    );
+    expect(concurrencyGroup).toContain(
+      "github.event_name == 'pull_request_review_comment' && github.run_id",
+    );
+    expect(concurrencyGroup).toContain("github.event.pull_request.number");
+    expect(workflow).not.toContain("cancel-in-progress: true");
+    expect(workflow).not.toContain("queue: max");
+    expect(workflow).toContain("name: Recompute current Codex review state");
+    expect(workflow).not.toContain("github.event.pull_request.head.sha");
+    const codexReviewScript = readFileSync(codexReviewScriptPath, "utf8");
+    expect(codexReviewScript).toContain("isCurrentReviewDelivery");
+    expect(codexReviewScript).toContain("readCodexReviewState");
+    expect(codexReviewScript).toContain("isCodexReviewPublicationCurrent");
+    expect(codexReviewScript).toContain("MAX_PUBLICATION_RECONCILIATIONS");
+
+    const supersededMessageOffset = codexReviewScript.indexOf(
+      "Skipping a superseded review delivery; a newer delivery owns recomputation.",
+    );
+    const supersededPublicationOffset = codexReviewScript.lastIndexOf(
+      "publishDecision({",
+      supersededMessageOffset,
+    );
+    expect(supersededPublicationOffset).toBeGreaterThan(-1);
+    expect(supersededPublicationOffset).toBeLessThan(supersededMessageOffset);
+    expect(codexReviewScript.slice(supersededPublicationOffset, supersededMessageOffset)).toContain(
+      "existingCheckRuns: reviewState.checkRuns",
+    );
+    const currentStateReadOffset = codexReviewScript.indexOf(
+      "const currentReviewState = readCodexReviewState",
+      supersededMessageOffset,
+    );
+    expect(currentStateReadOffset).toBeGreaterThan(supersededMessageOffset);
+    expect(codexReviewScript.slice(supersededMessageOffset, currentStateReadOffset)).not.toContain(
+      "return;",
+    );
+  });
+
+  it("documents the narrow Codex governance exception and exactly five contexts", () => {
+    expect(REQUIRED_CONTEXTS).toEqual([
+      "Root quality gate",
+      "Owner approval",
+      "CodeQL analysis",
+      "Dependency review",
+      "Codex review",
+    ]);
+    expect(REQUIRED_CHECK_BINDINGS).toEqual([
+      { context: "Codex review", app_id: TRUSTED_GITHUB_ACTIONS_APP_ID },
+    ]);
+
+    const documentation = readFileSync(documentationPath, "utf8");
+    expect(documentation).toContain("#38");
+    expect(documentation).toContain("#51");
+    expect(documentation).toContain("#55");
+    expect(documentation).toContain("required code-review context");
+    expect(documentation).toContain("+1");
+    expect(documentation).toContain("-1");
+    expect(documentation).toContain("official status API");
   });
 });

@@ -22,8 +22,8 @@ export function hasExpectedCodexReviewBinding(checks) {
   }
 
   const codexBindings = checks
-    .filter(({ context }) => context === "Codex review")
-    .map(({ context, app_id }) => ({ context, app_id }));
+    .filter((check) => check?.context === "Codex review")
+    .map((check) => ({ context: check.context, app_id: check.app_id }));
 
   return JSON.stringify(codexBindings) === JSON.stringify(REQUIRED_CHECK_BINDINGS);
 }

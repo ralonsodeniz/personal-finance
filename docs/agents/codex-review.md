@@ -166,3 +166,76 @@ When `Codex review` is pending or failing:
 
 No real credentials, live Codex dependency, pull-request code, or application
 behavior is part of this bridge's tests.
+
+## Governance decision
+
+Parent specification [#38](https://github.com/ralonsodeniz/personal-finance/issues/38)
+keeps conversational AI advisory in general. Issues
+[#51](https://github.com/ralonsodeniz/personal-finance/issues/51) and
+[#55](https://github.com/ralonsodeniz/personal-finance/issues/55) record the
+narrow exception accepted here: the repository's native Codex compatibility
+bridge is a required code-review context. The exception does not make an AI
+comment an approval, replace deterministic checks, or grant release authority.
+Other AI providers remain advisory.
+
+## Workflow boundary and duplicate delivery
+
+The supporting job is named `Recompute current Codex review state`; it is not
+a second merge authority. Lifecycle and issue-comment deliveries use a
+pull-request concurrency group with the supported `cancel-in-progress: false`
+setting. `pull_request_review` and `pull_request_review_comment` deliveries
+include their unique `github.run_id` in the group, so adjacent native-review
+deliveries cannot cancel one another and leave a misleading supporting failure
+in the status rollup. Before publishing, the evaluator also compares the
+delivery's review/comment timestamp and ID with the fetched review surfaces;
+superseded deliveries publish their verified current-state decision before
+continuing through the same post-publication reconciliation before exiting
+successfully. Immediately after
+publishing, it re-reads the authoritative review, comment, and check-run state;
+if a newer delivery changed the decision during the write window, the run
+reconciles the managed check to that newer decision, and a failed re-read
+publishes a current-head non-success result. This post-publication freshness
+fence also verifies that the managed `Codex review` check run itself contains
+the authoritative decision before accepting publication; if another delivery
+overwrites it, the run republishes or fails closed. When duplicate trusted
+managed copies exist for the same head, every copy must agree with that
+decision; a conflict remains non-success rather than accepting one matching
+copy. It prevents a delayed snapshot from remaining as a newer decision's
+stale overwrite. A
+reconciliation that adopts a newer snapshot then validates that snapshot
+without requiring the original delivery to remain newest. A
+`pull_request_review` dismissal is always recomputed even when GitHub exposes
+only the dismissed review's original submission timestamp;
+otherwise a later child comment could make the dismissal look superseded and
+leave dismissed evidence authoritative. A `pull_request_review_comment`
+deletion is treated the same way because its payload retains the deleted
+comment's original timestamp; otherwise a later review artifact could make
+the deletion look superseded and leave deleted PASS evidence authoritative.
+A `pull_request_review_comment` edit is also always recomputed because the
+payload retains the edited comment's original creation timestamp; otherwise a
+later review artifact could make an edited finding look superseded and leave a
+stale PASS authoritative.
+A `pull_request_review` edit is also always recomputed because GitHub retains
+the original review submission timestamp for edits; otherwise an edited PASS
+could leave a new current-head finding hidden behind a later artifact.
+Cross-surface review/comment timestamps that tie are treated as the same
+generation so either delivery recomputes the full authoritative state. That
+supporting run is
+non-required and never becomes the stable check's conclusion or status-rollup
+authority: only the managed `Codex review` check is the required context. Each
+current delivery re-reads authoritative PR metadata and republishes the stable
+check for that head. A delivery that loses the freshness comparison still
+publishes its verified current-state decision before exiting, so a prior stable
+success cannot remain authoritative while a newer finding is already visible.
+The documented recovery path reruns it if a platform failure still prevents
+publication.
+
+## Review-comment assessment
+
+Assess each review comment with `+1` when the finding is accepted/correct or
+`-1` when it is rejected/not applicable, then reply with exact evidence. These
+reactions are assessment telemetry only; neither reaction can authorize a
+merge. The five required contexts are `Root quality gate`, `Owner approval`,
+`CodeQL analysis`, `Dependency review`, and `Codex review`. The Codex context
+must be bound to the trusted GitHub Actions app ID `15368`; it never grants
+Owner release authorization.

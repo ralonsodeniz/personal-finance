@@ -93,6 +93,9 @@ assertAllIncludes(
     "contents: read",
     "issues: read",
     "pull-requests: read",
+    "cancel-in-progress: false",
+    "github.event_name == 'pull_request_review' && github.run_id",
+    "github.event_name == 'pull_request_review_comment' && github.run_id",
     "repository: ralonsodeniz/personal-finance",
     "ref: main",
     "persist-credentials: false",
@@ -106,6 +109,8 @@ assertAllExcludes(
   codexReviewWorkflow,
   [
     "pull_request:\n",
+    "cancel-in-progress: true",
+    "queue: max",
     "contents: write",
     "issues: write",
     "pull-requests: write",
@@ -124,12 +129,48 @@ assertAllIncludes(
   "security-gates documentation",
 );
 
+assertIncludes(
+  readRepositoryFile("scripts/codex-review.mjs"),
+  "isCurrentReviewDelivery",
+  "Codex review evaluator",
+);
+
+assertAllIncludes(
+  readRepositoryFile("scripts/codex-review.mjs"),
+  [
+    "readCodexReviewState",
+    "isCodexReviewPublicationCurrent",
+    "MAX_PUBLICATION_RECONCILIATIONS",
+    "isPullRequestReviewDismissalDelivery",
+    "isPullRequestReviewCommentDeletionDelivery",
+    "isPullRequestReviewEditDelivery",
+  ],
+  "Codex review publication freshness fence",
+);
+
 assertAllIncludes(
   readRepositoryFile("docs/agents/codex-review.md"),
   ["compatibility bridge", "@codex review", "official status API"],
   "Codex review documentation",
 );
 
+assertAllIncludes(
+  readRepositoryFile("docs/architecture/main-protection.md"),
+  [
+    "five stable check contexts",
+    "app_id: 15368",
+    "issue #51",
+    "issue #55",
+    "protection/required_status_checks",
+  ],
+  "main protection documentation",
+);
+
+assertAllIncludes(
+  readRepositoryFile("docs/agents/pr-lifecycle.md"),
+  ["exactly one active lifecycle owner", "manual-merge reconciliation", "+1", "-1"],
+  "pull-request lifecycle documentation",
+);
 const severityRank = new Map([
   ["low", 0],
   ["moderate", 1],

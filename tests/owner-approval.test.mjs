@@ -1,9 +1,14 @@
-import { readFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { URL, fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 import {
   APPROVAL_COMMENT_MARKER,
+  GH_API_MAX_BUFFER,
+  GH_API_TIMEOUT_MS,
   MANAGED_CHECK_MARKER,
   OWNER_APPROVAL_COMMAND,
   OWNER_APPROVAL_CHECK_NAME,
@@ -14,16 +19,24 @@ import {
   TRUSTED_GITHUB_ACTIONS_APP_SLUG,
   buildOwnerApprovalCheckPayload,
   evaluateOwnerApproval,
+  flattenCheckRunPages,
+  flattenIssueCommentPages,
+  getEventHeadSha,
+  getFallbackHeadSha,
   getManagedApprovalCommentId,
   isExactOwnerApprovalComment,
   isManagedOwnerApprovalCheckRun,
   isOwnerApprovalTarget,
+  runGhApi,
 } from "../scripts/owner-approval.mjs";
 
 const currentHeadSha = "a".repeat(40);
 const previousHeadSha = "b".repeat(40);
 const workflowPath = fileURLToPath(
   new URL("../.github/workflows/owner-approval.yml", import.meta.url),
+);
+const ownerApprovalScriptPath = fileURLToPath(
+  new URL("../scripts/owner-approval.mjs", import.meta.url),
 );
 const documentationPath = fileURLToPath(
   new URL("../docs/agents/owner-approval.md", import.meta.url),
@@ -67,6 +80,20 @@ function grantedCheck(headSha = currentHeadSha, approvalCommentId = "101") {
       text: `${MANAGED_CHECK_MARKER}\nCurrent head SHA: ${headSha}\n${APPROVAL_COMMENT_MARKER} ${approvalCommentId}`,
     },
     status: "completed",
+  };
+}
+
+function boundFailureCheck(headSha = currentHeadSha, approvalCommentId = "101") {
+  return {
+    ...buildOwnerApprovalCheckPayload({
+      decision: {
+        approvalCommentId,
+        conclusion: "failure",
+        headSha,
+        reason: "The current pull-request metadata could not be verified; retry is required.",
+      },
+    }),
+    app: trustedGitHubActionsApp,
   };
 }
 
@@ -180,6 +207,20 @@ describe("owner approval policy", () => {
     });
 
     expect(decision.conclusion).toBe("success");
+  });
+
+  it("recovers a bound authorization after a transient non-success result", () => {
+    const failure = boundFailureCheck();
+
+    expect(isManagedOwnerApprovalCheckRun(failure, currentHeadSha)).toBe(true);
+    expect(getManagedApprovalCommentId(failure, currentHeadSha)).toBeUndefined();
+    expect(
+      evaluateOwnerApproval({
+        checkRuns: [failure],
+        comments: [ownerComment()],
+        pullRequest: pullRequest(),
+      }).conclusion,
+    ).toBe("success");
   });
 
   it("revokes authorization when the last exact comment is edited or deleted", () => {
@@ -326,6 +367,331 @@ describe("owner approval policy", () => {
       status: "completed",
     });
     expect(payload.output.text).toContain(currentHeadSha);
+    expect(payload.output.text).toContain(`${APPROVAL_COMMENT_MARKER} 101`);
+  });
+
+  it("bounds GitHub API calls and recovers issue-comment heads from trusted metadata", () => {
+    expect(GH_API_TIMEOUT_MS).toBe(30_000);
+    expect(GH_API_MAX_BUFFER).toBe(8 * 1024 * 1024);
+    expect(getEventHeadSha({ pull_request: { head: { sha: currentHeadSha } } })).toBe(
+      currentHeadSha,
+    );
+    expect(
+      getEventHeadSha({
+        issue: { pull_request: { url: "https://api.github.com/repos/example/pulls/39" } },
+      }),
+    ).toBeUndefined();
+    expect(
+      getFallbackHeadSha(
+        {
+          issue: {
+            number: 39,
+            pull_request: { url: "https://api.github.com/repos/example/pulls/39" },
+          },
+        },
+        currentHeadSha,
+      ),
+    ).toBe(currentHeadSha);
+    expect(getFallbackHeadSha({}, "not-a-sha")).toBeUndefined();
+  });
+
+  it("enforces timeout and output bounds on GitHub API subprocesses", () => {
+    const temporaryDirectory = mkdtempSync(join(tmpdir(), "owner-approval-test-"));
+    const ghPath = join(temporaryDirectory, "gh");
+    const fakeGh = `#!/usr/bin/env node
+const args = process.argv.slice(2);
+if (args.includes("timeout")) {
+  setInterval(() => {}, 1000);
+} else {
+  process.stdout.write("x".repeat(2048));
+}
+`;
+
+    try {
+      writeFileSync(ghPath, fakeGh);
+      chmodSync(ghPath, 0o755);
+      const environment = { ...process.env, PATH: `${temporaryDirectory}:${process.env.PATH}` };
+
+      expect(() =>
+        runGhApi(["timeout"], undefined, {
+          env: environment,
+          timeout: 25,
+          maxBuffer: GH_API_MAX_BUFFER,
+        }),
+      ).toThrowError(expect.objectContaining({ code: "ETIMEDOUT" }));
+      expect(() =>
+        runGhApi(["buffer"], undefined, {
+          env: environment,
+          timeout: GH_API_TIMEOUT_MS,
+          maxBuffer: 1024,
+        }),
+      ).toThrowError(expect.objectContaining({ code: "ENOBUFS" }));
+    } finally {
+      rmSync(temporaryDirectory, { force: true, recursive: true });
+    }
+  });
+
+  it("publishes a current-head failure when issue-comment metadata lookup fails", () => {
+    const temporaryDirectory = mkdtempSync(join(tmpdir(), "owner-approval-test-"));
+    const eventPath = join(temporaryDirectory, "event.json");
+    const ghPath = join(temporaryDirectory, "gh");
+    const recordPath = join(temporaryDirectory, "check-payload.json");
+    const fakeGh = `#!/usr/bin/env node
+import { readFileSync, writeFileSync } from "node:fs";
+const args = process.argv.slice(2);
+if (args.includes("graphql")) {
+  console.log(JSON.stringify({ data: { repository: { pullRequest: { headRefOid: ${JSON.stringify(currentHeadSha)} } } } }));
+  process.exit(0);
+}
+if (args.some((argument) => argument.includes("/pulls/39"))) {
+  console.error("metadata unavailable");
+  process.exit(1);
+}
+if (args.some((argument) => argument.includes("/check-runs?"))) {
+  console.log(${JSON.stringify(JSON.stringify([{ check_runs: [grantedCheck()] }]))});
+  process.exit(0);
+}
+if (args.includes("POST") || args.includes("PATCH")) {
+  writeFileSync(${JSON.stringify(recordPath)}, readFileSync(0, "utf8"));
+  console.log("{}");
+  process.exit(0);
+}
+console.log("{}");
+`;
+
+    try {
+      writeFileSync(
+        eventPath,
+        JSON.stringify({
+          issue: { number: 39, pull_request: { url: "https://api.github.com/pulls/39" } },
+        }),
+      );
+      writeFileSync(ghPath, fakeGh);
+      chmodSync(ghPath, 0o755);
+
+      let workflowError;
+
+      try {
+        execFileSync(process.execPath, [ownerApprovalScriptPath], {
+          cwd: fileURLToPath(new URL("..", import.meta.url)),
+          encoding: "utf8",
+          stdio: ["ignore", "pipe", "pipe"],
+          env: {
+            ...process.env,
+            GITHUB_EVENT_NAME: "issue_comment",
+            GITHUB_EVENT_PATH: eventPath,
+            GITHUB_REPOSITORY: "ralonsodeniz/personal-finance",
+            PATH: `${temporaryDirectory}:${process.env.PATH}`,
+          },
+        });
+      } catch (error) {
+        workflowError = error;
+      }
+
+      expect(workflowError?.status).toBe(1);
+      expect(readFileSync(recordPath, "utf8")).toMatch(
+        new RegExp(`"conclusion":"failure".*Current head SHA: ${currentHeadSha}`),
+      );
+      expect(readFileSync(recordPath, "utf8")).toContain(`${APPROVAL_COMMENT_MARKER} 101`);
+    } finally {
+      rmSync(temporaryDirectory, { force: true, recursive: true });
+    }
+  });
+
+  it("publishes a current-head failure when lifecycle metadata lookup fails", () => {
+    const temporaryDirectory = mkdtempSync(join(tmpdir(), "owner-approval-test-"));
+    const eventPath = join(temporaryDirectory, "event.json");
+    const ghPath = join(temporaryDirectory, "gh");
+    const recordPath = join(temporaryDirectory, "check-payload.json");
+    const fakeGh = `#!/usr/bin/env node
+import { readFileSync, writeFileSync } from "node:fs";
+const args = process.argv.slice(2);
+if (args.some((argument) => argument.includes("/pulls/39"))) {
+  console.error("metadata unavailable");
+  process.exit(1);
+}
+if (args.some((argument) => argument.includes("/check-runs?"))) {
+  console.log("[{\\"check_runs\\":[]}]");
+  process.exit(0);
+}
+if (args.includes("POST")) {
+  writeFileSync(${JSON.stringify(recordPath)}, readFileSync(0, "utf8"));
+  console.log("{}");
+  process.exit(0);
+}
+console.log("[]");
+`;
+
+    try {
+      writeFileSync(
+        eventPath,
+        JSON.stringify({
+          pull_request: { number: 39, head: { sha: currentHeadSha } },
+        }),
+      );
+      writeFileSync(ghPath, fakeGh);
+      chmodSync(ghPath, 0o755);
+
+      let workflowError;
+
+      try {
+        execFileSync(process.execPath, [ownerApprovalScriptPath], {
+          cwd: fileURLToPath(new URL("..", import.meta.url)),
+          encoding: "utf8",
+          stdio: ["ignore", "pipe", "pipe"],
+          env: {
+            ...process.env,
+            GITHUB_EVENT_NAME: "pull_request_target",
+            GITHUB_EVENT_PATH: eventPath,
+            GITHUB_REPOSITORY: "ralonsodeniz/personal-finance",
+            PATH: `${temporaryDirectory}:${process.env.PATH}`,
+          },
+        });
+      } catch (error) {
+        workflowError = error;
+      }
+
+      expect(workflowError?.status).toBe(1);
+      expect(readFileSync(recordPath, "utf8")).toMatch(
+        new RegExp(`"conclusion":"failure".*"head_sha":"${currentHeadSha}"`),
+      );
+    } finally {
+      rmSync(temporaryDirectory, { force: true, recursive: true });
+    }
+  });
+
+  it("publishes a current-head failure when approval-state API lookup fails", () => {
+    const temporaryDirectory = mkdtempSync(join(tmpdir(), "owner-approval-test-"));
+    const eventPath = join(temporaryDirectory, "event.json");
+    const ghPath = join(temporaryDirectory, "gh");
+    const recordPath = join(temporaryDirectory, "check-payload.json");
+    const fakeGh = `#!/usr/bin/env node
+import { readFileSync, writeFileSync } from "node:fs";
+const args = process.argv.slice(2);
+if (args.some((argument) => argument.includes("/pulls/39"))) {
+  console.log(JSON.stringify({ number: 39, state: "open", base: { ref: "main" }, head: { sha: ${JSON.stringify(currentHeadSha)} } }));
+  process.exit(0);
+}
+if (args.some((argument) => argument.includes("/issues/39/comments"))) {
+  console.error("comments unavailable");
+  process.exit(1);
+}
+if (args.some((argument) => argument.includes("/check-runs?"))) {
+  console.log("[{\\"check_runs\\":[]}]");
+  process.exit(0);
+}
+if (args.includes("POST")) {
+  writeFileSync(${JSON.stringify(recordPath)}, readFileSync(0, "utf8"));
+  console.log("{}");
+  process.exit(0);
+}
+console.log("{}");
+`;
+
+    try {
+      writeFileSync(
+        eventPath,
+        JSON.stringify({
+          issue: { number: 39, pull_request: { url: "https://api.github.com/pulls/39" } },
+        }),
+      );
+      writeFileSync(ghPath, fakeGh);
+      chmodSync(ghPath, 0o755);
+
+      let workflowError;
+
+      try {
+        execFileSync(process.execPath, [ownerApprovalScriptPath], {
+          cwd: fileURLToPath(new URL("..", import.meta.url)),
+          encoding: "utf8",
+          stdio: ["ignore", "pipe", "pipe"],
+          env: {
+            ...process.env,
+            GITHUB_EVENT_NAME: "issue_comment",
+            GITHUB_EVENT_PATH: eventPath,
+            GITHUB_REPOSITORY: "ralonsodeniz/personal-finance",
+            PATH: `${temporaryDirectory}:${process.env.PATH}`,
+          },
+        });
+      } catch (error) {
+        workflowError = error;
+      }
+
+      expect(workflowError?.status).toBe(1);
+      expect(readFileSync(recordPath, "utf8")).toMatch(
+        new RegExp(`"conclusion":"failure".*"head_sha":"${currentHeadSha}"`),
+      );
+    } finally {
+      rmSync(temporaryDirectory, { force: true, recursive: true });
+    }
+  });
+
+  it("fails closed without publishing when no authoritative fallback head exists", () => {
+    const temporaryDirectory = mkdtempSync(join(tmpdir(), "owner-approval-test-"));
+    const eventPath = join(temporaryDirectory, "event.json");
+    const ghPath = join(temporaryDirectory, "gh");
+    const recordPath = join(temporaryDirectory, "check-payload.json");
+    const fakeGh = `#!/usr/bin/env node
+import { writeFileSync } from "node:fs";
+const args = process.argv.slice(2);
+if (args.includes("graphql")) {
+  console.log(JSON.stringify({ data: { repository: { pullRequest: {} } } }));
+  process.exit(0);
+}
+if (args.some((argument) => argument.includes("/pulls/39"))) {
+  process.exit(1);
+}
+if (args.includes("POST")) {
+  writeFileSync(${JSON.stringify(recordPath)}, "unexpected publication");
+}
+console.log("{}");
+`;
+
+    try {
+      writeFileSync(
+        eventPath,
+        JSON.stringify({
+          issue: { number: 39, pull_request: { url: "https://api.github.com/pulls/39" } },
+        }),
+      );
+      writeFileSync(ghPath, fakeGh);
+      chmodSync(ghPath, 0o755);
+
+      let workflowError;
+
+      try {
+        execFileSync(process.execPath, [ownerApprovalScriptPath], {
+          cwd: fileURLToPath(new URL("..", import.meta.url)),
+          encoding: "utf8",
+          stdio: ["ignore", "pipe", "pipe"],
+          env: {
+            ...process.env,
+            GITHUB_EVENT_NAME: "issue_comment",
+            GITHUB_EVENT_PATH: eventPath,
+            GITHUB_REPOSITORY: "ralonsodeniz/personal-finance",
+            PATH: `${temporaryDirectory}:${process.env.PATH}`,
+          },
+        });
+      } catch (error) {
+        workflowError = error;
+      }
+
+      expect(workflowError?.status).toBe(1);
+      expect(existsSync(recordPath)).toBe(false);
+    } finally {
+      rmSync(temporaryDirectory, { force: true, recursive: true });
+    }
+  });
+
+  it("rejects malformed paginated API responses instead of discarding pages", () => {
+    expect(flattenIssueCommentPages([[ownerComment()]])).toHaveLength(1);
+    expect(() => flattenIssueCommentPages([[ownerComment()], { body: "unexpected" }])).toThrow(
+      "malformed issue-comment pages",
+    );
+    expect(flattenCheckRunPages([{ check_runs: [] }])).toEqual([]);
+    expect(() => flattenCheckRunPages([{ check_runs: [] }, []])).toThrow(
+      "malformed check-run pages",
+    );
   });
 
   it("records the approving comment ID in a successful check", () => {

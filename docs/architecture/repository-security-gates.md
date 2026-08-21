@@ -17,6 +17,13 @@ must not be prefixed to the context when configuring `main` protection:
 
 The existing quality check remains `Root quality gate`.
 
+The exact protected merge policy also includes the native `Codex review`
+compatibility bridge. This is the narrow issue #51/#55 exception to parent #38's
+general advisory-AI policy: it is a required code-review context, not a human
+approval or release authorization. The structured required-check entry must be
+bound to the trusted GitHub Actions app ID `15368`, and the separate
+`Owner approval` context remains the explicit release gate.
+
 ## Trigger and threshold policy
 
 - CodeQL analyzes JavaScript and TypeScript on pull requests targeting `main`,
@@ -31,6 +38,16 @@ The existing quality check remains `Root quality gate`.
   only the additional `security-events: write` permission required to upload
   its analysis results. Neither workflow uses `pull_request_target`, secrets,
   or pull-request-controlled commands.
+- The Codex workflow uses only `checks: write`, `contents: read`, `issues: read`,
+  and `pull-requests: read`; it checks out trusted `main`, does not execute
+  pull-request code, and uses `cancel-in-progress: false`. Lifecycle and
+  issue-comment deliveries serialize by pull request; review and
+  review-comment deliveries use their unique run IDs so adjacent native
+  deliveries cannot cancel a supporting recomputation run. The evaluator
+  suppresses superseded delivery snapshots before publication, preventing a
+  delayed decision from overwriting a newer one. The supporting job is not the
+  stable required check; only the current-head `Codex review` publication is
+  authoritative.
 
 ## Baseline evidence
 

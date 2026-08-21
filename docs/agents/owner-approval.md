@@ -71,6 +71,29 @@ gh pr checks <number>
 gh pr view <number> --json headRefOid,baseRefName,state,statusCheckRollup,mergeStateStatus
 ```
 
+## Metadata and API recovery
+
+Lifecycle and issue-comment deliveries must publish an explicit non-success
+`Owner approval` result for the authoritative current head whenever that head
+can be recovered. A lifecycle payload's full head SHA is used when present. An
+issue-comment payload commonly identifies the pull request only by URL; when
+the REST pull-request metadata read fails or omits the head, trusted default-
+branch support code queries GraphQL `repository(...).pullRequest(...).headRefOid`
+and binds the failure to that full SHA. The workflow never guesses a head from
+comment prose or an arbitrary commit list.
+
+Comments, check runs, malformed pagination, timeouts, and oversized GitHub API
+responses are verification failures. After publishing the current-head
+failure, the supporting job exits non-successfully so GitHub retries the
+verification. If no full current head can be established, it fails closed
+without publishing an unbound result. API subprocesses have a 30-second
+timeout and an 8 MiB output limit. When a recoverable metadata or comment-state
+failure has an existing trusted current-head approval binding, the published
+non-success result retains that approval-comment ID as binding metadata. A
+later successful recomputation can restore authorization only if the exact
+canonical-owner comment still exists; the failure itself never authorizes a
+merge.
+
 ## Security boundary
 
 The workflow uses `pull_request_target` so it can publish a check for a fork

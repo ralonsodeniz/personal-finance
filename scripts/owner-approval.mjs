@@ -13,6 +13,8 @@ export const TARGET_BRANCH = "main";
 export const TRUSTED_GITHUB_ACTIONS_APP_ID = 15368;
 export const TRUSTED_GITHUB_ACTIONS_APP_NAME = "GitHub Actions";
 export const TRUSTED_GITHUB_ACTIONS_APP_SLUG = "github-actions";
+export const GH_API_TIMEOUT_MS = 30_000;
+export const GH_API_MAX_BUFFER = 8 * 1024 * 1024;
 
 export function isExactOwnerApprovalComment(comment) {
   return (
@@ -81,9 +83,7 @@ function hasValidManagedOutput(checkRun, currentHeadSha) {
 
   const approvalCommentId = approvalCommentIdFromOutput(outputText);
 
-  return checkRun.conclusion === "success"
-    ? approvalCommentId !== undefined
-    : approvalCommentId === undefined;
+  return checkRun.conclusion === "success" ? approvalCommentId !== undefined : true;
 }
 
 export function isManagedOwnerApprovalCheckRun(checkRun, currentHeadSha) {
@@ -96,6 +96,14 @@ export function isManagedOwnerApprovalCheckRun(checkRun, currentHeadSha) {
     hasValidManagedOutput(checkRun, currentHeadSha) &&
     isTrustedGitHubActionsPublisher(checkRun)
   );
+}
+
+function getManagedApprovalBindingCommentId(checkRun, currentHeadSha) {
+  if (!isManagedOwnerApprovalCheckRun(checkRun, currentHeadSha)) {
+    return undefined;
+  }
+
+  return approvalCommentIdFromOutput(checkRun.output.text);
 }
 
 export function getManagedApprovalCommentId(checkRun, currentHeadSha) {
@@ -132,7 +140,7 @@ export function evaluateOwnerApproval({
       belongsToPullRequest(comment, pullRequest.number) && isExactOwnerApprovalComment(comment),
   );
   const currentHeadApprovalCommentId = checkRuns
-    .map((checkRun) => getManagedApprovalCommentId(checkRun, currentHeadSha))
+    .map((checkRun) => getManagedApprovalBindingCommentId(checkRun, currentHeadSha))
     .find((commentId) => exactApprovalComments.some((comment) => String(comment.id) === commentId));
   const exactApprovalEvent =
     (eventAction === "created" || eventAction === "edited") &&
@@ -167,12 +175,14 @@ export function buildOwnerApprovalCheckPayload({ decision }) {
 
   const isAuthorized = decision.conclusion === "success";
 
-  if (isAuthorized && !/^[1-9][0-9]*$/.test(String(decision.approvalCommentId ?? ""))) {
+  const approvalCommentId = String(decision.approvalCommentId ?? "");
+
+  if (isAuthorized && !/^[1-9][0-9]*$/.test(approvalCommentId)) {
     throw new Error("Successful owner approval checks require an approving comment ID.");
   }
 
-  const approvalCommentText = isAuthorized
-    ? `\n${APPROVAL_COMMENT_MARKER} ${decision.approvalCommentId}`
+  const approvalCommentText = /^[1-9][0-9]*$/.test(approvalCommentId)
+    ? `\n${APPROVAL_COMMENT_MARKER} ${approvalCommentId}`
     : "";
 
   return {
@@ -192,11 +202,18 @@ export function buildOwnerApprovalCheckPayload({ decision }) {
 
 const CANONICAL_REPOSITORY = "ralonsodeniz/personal-finance";
 
-function runGhApi(args, input) {
+export function runGhApi(
+  args,
+  input,
+  { timeout = GH_API_TIMEOUT_MS, maxBuffer = GH_API_MAX_BUFFER, env = process.env } = {},
+) {
   const result = spawnSync("gh", ["api", ...args], {
     encoding: "utf8",
-    env: process.env,
+    env,
     input,
+    killSignal: "SIGTERM",
+    timeout,
+    maxBuffer,
   });
 
   if (result.error) {
@@ -227,6 +244,26 @@ function runGhApiPaginated(endpoint) {
   return pages;
 }
 
+function flattenArrayPages(pages, errorMessage) {
+  if (!Array.isArray(pages) || pages.some((page) => !Array.isArray(page))) {
+    throw new Error(errorMessage);
+  }
+
+  return pages.flat();
+}
+
+export function flattenIssueCommentPages(pages) {
+  return flattenArrayPages(pages, "gh api returned malformed issue-comment pages.");
+}
+
+export function flattenCheckRunPages(pages) {
+  if (!Array.isArray(pages) || pages.some((page) => !page || !Array.isArray(page.check_runs))) {
+    throw new Error("gh api returned malformed check-run pages.");
+  }
+
+  return pages.flatMap((page) => page.check_runs);
+}
+
 function readEventPayload() {
   const eventPath = process.env.GITHUB_EVENT_PATH;
 
@@ -253,6 +290,20 @@ function eventIssueNumber(eventName, event) {
   return eventName === "issue_comment" ? event.issue?.number : undefined;
 }
 
+export function getEventHeadSha(event) {
+  return event?.pull_request?.head?.sha ?? event?.issue?.pull_request?.head?.sha;
+}
+
+export function getFallbackHeadSha(event, authoritativeHeadSha) {
+  const eventHeadSha = getEventHeadSha(event);
+
+  if (isFullSha(eventHeadSha)) {
+    return eventHeadSha;
+  }
+
+  return isFullSha(authoritativeHeadSha) ? authoritativeHeadSha : undefined;
+}
+
 function canonicalRepositoryParts() {
   if (process.env.GITHUB_REPOSITORY !== CANONICAL_REPOSITORY) {
     throw new Error(`This workflow only runs for ${CANONICAL_REPOSITORY}.`);
@@ -267,18 +318,48 @@ function pullRequestFromApi({ owner, repo, number }) {
   return runGhApiJson([`repos/${owner}/${repo}/pulls/${number}`]);
 }
 
+function pullRequestHeadShaFromGraphql({ owner, repo, number }) {
+  const query = [
+    "query($owner: String!, $repo: String!, $number: Int!) {",
+    "repository(owner: $owner, name: $repo) {",
+    "pullRequest(number: $number) { headRefOid }",
+    "}",
+    "}",
+  ].join(" ");
+  const response = runGhApiJson([
+    "graphql",
+    "-f",
+    `query=${query}`,
+    "-f",
+    `owner=${owner}`,
+    "-f",
+    `repo=${repo}`,
+    "-F",
+    `number=${number}`,
+  ]);
+  const headSha = response?.data?.repository?.pullRequest?.headRefOid;
+
+  if (!isFullSha(headSha)) {
+    throw new Error("The authoritative pull-request metadata did not return a full head SHA.");
+  }
+
+  return headSha;
+}
+
 function commentsFromApi({ owner, repo, number }) {
-  return runGhApiPaginated(`repos/${owner}/${repo}/issues/${number}/comments?per_page=100`).flatMap(
-    (page) => (Array.isArray(page) ? page : []),
+  return flattenIssueCommentPages(
+    runGhApiPaginated(`repos/${owner}/${repo}/issues/${number}/comments?per_page=100`),
   );
 }
 
 function checkRunsFromApi({ owner, repo, headSha }) {
   const checkName = encodeURIComponent(OWNER_APPROVAL_CHECK_NAME);
 
-  return runGhApiPaginated(
-    `repos/${owner}/${repo}/commits/${headSha}/check-runs?check_name=${checkName}&per_page=100`,
-  ).flatMap((page) => (Array.isArray(page?.check_runs) ? page.check_runs : []));
+  return flattenCheckRunPages(
+    runGhApiPaginated(
+      `repos/${owner}/${repo}/commits/${headSha}/check-runs?check_name=${checkName}&per_page=100`,
+    ),
+  );
 }
 
 function updateCheckRun({ owner, repo, checkRunId, payload }) {
@@ -320,8 +401,19 @@ function upsertOwnerApprovalCheck({ owner, repo, existingCheckRuns, payload }) {
   }
 }
 
-function failureDecision(headSha, reason) {
-  return { conclusion: "failure", headSha, reason };
+function failureDecision(headSha, reason, details = {}) {
+  return { conclusion: "failure", headSha, reason, ...details };
+}
+
+function hasVerifiablePullRequestMetadata(pullRequest) {
+  return (
+    pullRequest !== null &&
+    typeof pullRequest === "object" &&
+    !Array.isArray(pullRequest) &&
+    typeof pullRequest.state === "string" &&
+    typeof pullRequest.base?.ref === "string" &&
+    isFullSha(pullRequest.head?.sha)
+  );
 }
 
 function publishDecision({ owner, repo, existingCheckRuns, decision }) {
@@ -331,6 +423,46 @@ function publishDecision({ owner, repo, existingCheckRuns, decision }) {
   console.log(
     `Owner approval ${payload.conclusion} for head ${payload.head_sha}: ${decision.reason}`,
   );
+}
+
+function publishMetadataFailure({ owner, repo, event, pullRequestNumber, reason, originalError }) {
+  let fallbackHeadSha;
+
+  try {
+    const authoritativeHeadSha = isFullSha(getEventHeadSha(event))
+      ? getEventHeadSha(event)
+      : pullRequestHeadShaFromGraphql({ owner, repo, number: pullRequestNumber });
+
+    fallbackHeadSha = getFallbackHeadSha(event, authoritativeHeadSha);
+  } catch (fallbackError) {
+    console.error("Could not resolve a fallback pull-request head SHA.");
+    console.error(fallbackError);
+  }
+
+  if (!isFullSha(fallbackHeadSha)) {
+    throw originalError;
+  }
+
+  let existingCheckRuns = [];
+
+  try {
+    existingCheckRuns = checkRunsFromApi({ owner, repo, headSha: fallbackHeadSha });
+  } catch (checkRunsError) {
+    console.error("Could not read existing Owner approval check runs while publishing failure.");
+    console.error(checkRunsError);
+  }
+
+  const approvalCommentId = existingCheckRuns
+    .map((checkRun) => getManagedApprovalBindingCommentId(checkRun, fallbackHeadSha))
+    .find((commentId) => commentId !== undefined);
+
+  publishDecision({
+    existingCheckRuns,
+    owner,
+    repo,
+    decision: failureDecision(fallbackHeadSha, reason, { approvalCommentId }),
+  });
+  throw originalError;
 }
 
 function runWorkflow() {
@@ -348,25 +480,30 @@ function runWorkflow() {
   try {
     pullRequest = pullRequestFromApi({ owner, repo, number: pullRequestNumber });
   } catch (error) {
-    const fallbackHeadSha = event.pull_request?.head?.sha;
-
-    if (!isFullSha(fallbackHeadSha)) {
-      throw error;
-    }
-
-    publishDecision({
-      existingCheckRuns: [],
+    publishMetadataFailure({
       owner,
       repo,
-      decision: failureDecision(
-        fallbackHeadSha,
-        "The current pull-request metadata could not be verified; retry is required.",
-      ),
+      event,
+      pullRequestNumber,
+      reason: "The current pull-request metadata could not be verified; retry is required.",
+      originalError: error,
     });
-    throw error;
   }
 
-  const currentHeadSha = pullRequest?.head?.sha;
+  if (!hasVerifiablePullRequestMetadata(pullRequest)) {
+    const metadataError = new Error("The pull request metadata was malformed; retry is required.");
+
+    publishMetadataFailure({
+      owner,
+      repo,
+      event,
+      pullRequestNumber,
+      reason: "The current pull-request metadata was malformed; retry is required.",
+      originalError: metadataError,
+    });
+  }
+
+  const currentHeadSha = pullRequest.head.sha;
 
   if (!isOwnerApprovalTarget(pullRequest)) {
     console.log("Owner approval is not applicable to this closed or non-main pull request.");
@@ -402,6 +539,11 @@ function runWorkflow() {
       ? failureDecision(
           currentHeadSha,
           "The current approval state could not be verified; retry is required.",
+          {
+            approvalCommentId: checkRuns
+              .map((checkRun) => getManagedApprovalBindingCommentId(checkRun, currentHeadSha))
+              .find((commentId) => commentId !== undefined),
+          },
         )
       : evaluateOwnerApproval({
           checkRuns,
@@ -420,7 +562,10 @@ function runWorkflow() {
   });
 
   if (commentsError || checkRunsError) {
-    console.error(commentsError ?? checkRunsError);
+    const verificationError = commentsError ?? checkRunsError;
+
+    console.error(verificationError);
+    throw verificationError;
   }
 }
 
