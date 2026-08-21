@@ -26,7 +26,8 @@ The full `commit_id` or current pull-request metadata is authoritative. The
 abbreviated value in `Reviewed commit: \`<prefix>\`` is only a consistency
 check against that full head. A missing, ambiguous, malformed, or conflicting
 binding is not evidence. The generic native review envelope is not itself a
-PASS; an active current-head inline finding is a failing review artifact.
+PASS; an active current-head review body that is not a recognized final result,
+or an inline finding, is a failing review artifact.
 
 The bridge trusts the observed native publisher identity
 `chatgpt-codex-connector[bot]`, whose immutable GitHub user ID is `199175422`

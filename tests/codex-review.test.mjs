@@ -207,6 +207,26 @@ describe("Codex review protocol", () => {
     });
   });
 
+  it("blocks a current trusted review body that is not a native final result", () => {
+    const decision = evaluateCodexReview({
+      comments: [codexComment()],
+      pullRequestReviews: [
+        nativePullRequestReview({
+          id: 502,
+          body: "**P1 Badge** Current-head finding prose.",
+        }),
+      ],
+      pullRequestReviewComments: [],
+      pullRequest: pullRequest(),
+    });
+
+    expect(decision).toMatchObject({
+      conclusion: "failure",
+      result: "CHANGES_REQUESTED",
+      resultCommentId: "502",
+    });
+  });
+
   it("uses full review commit IDs and checks abbreviated native text against them", () => {
     expect(
       evaluateCodexReview({
@@ -308,7 +328,9 @@ describe("Codex review protocol", () => {
   it("does not let a stale inline finding poison a fresh current result", () => {
     const decision = evaluateCodexReview({
       comments: [codexComment()],
-      pullRequestReviews: [nativePullRequestReview({ body: "Native review summary" })],
+      pullRequestReviews: [
+        nativePullRequestReview({ body: "Native review summary", commit_id: previousHeadSha }),
+      ],
       pullRequestReviewComments: [nativePullRequestReviewComment({ commit_id: previousHeadSha })],
       pullRequest: pullRequest(),
     });
