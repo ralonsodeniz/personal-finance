@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 
 const repository = "ralonsodeniz/personal-finance";
 const defaultBranch = "main";
+export const TRUSTED_GITHUB_ACTIONS_APP_ID = 15368;
 export const REQUIRED_CONTEXTS = [
   "Root quality gate",
   "Owner approval",
@@ -11,6 +12,21 @@ export const REQUIRED_CONTEXTS = [
   "Dependency review",
   "Codex review",
 ];
+export const REQUIRED_CHECK_BINDINGS = [
+  { context: "Codex review", app_id: TRUSTED_GITHUB_ACTIONS_APP_ID },
+];
+
+export function hasExpectedCodexReviewBinding(checks) {
+  if (!Array.isArray(checks)) {
+    return false;
+  }
+
+  const codexBindings = checks
+    .filter(({ context }) => context === "Codex review")
+    .map(({ context, app_id }) => ({ context, app_id }));
+
+  return JSON.stringify(codexBindings) === JSON.stringify(REQUIRED_CHECK_BINDINGS);
+}
 
 function run(command, args) {
   const result = spawnSync(command, args, {
@@ -108,6 +124,10 @@ function verifyProtection() {
     "main structured required-check contexts changed",
   );
   assert(
+    hasExpectedCodexReviewBinding(statusChecks.checks),
+    "main Codex review publisher binding changed",
+  );
+  assert(
     protection.enforce_admins?.enabled === true,
     "main must enforce the rule for administrators.",
   );
@@ -199,6 +219,6 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   verifyNoOverlappingRulesets();
 
   console.log(
-    `Authenticated main protection verification passed: one branch-protection rule, ${REQUIRED_CONTEXTS.length} required contexts, zero normal human approvals, no bypass actors, resolved conversations, administrator enforcement, and no force-push/deletion.`,
+    `Authenticated main protection verification passed: one branch-protection rule, ${REQUIRED_CONTEXTS.length} required contexts, Codex review bound to GitHub Actions app ${TRUSTED_GITHUB_ACTIONS_APP_ID}, zero normal human approvals, no bypass actors, resolved conversations, administrator enforcement, and no force-push/deletion.`,
   );
 }

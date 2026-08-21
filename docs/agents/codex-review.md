@@ -37,6 +37,9 @@ fields exactly. The separate public `codex` profile (ID `267193182`, type
 check is accepted as managed only when it was published by the trusted GitHub
 Actions app metadata (app ID `15368`, slug `github-actions`, and name `GitHub
 Actions`).
+The protection verifier separately requires the structured `Codex review`
+context to bind to GitHub Actions app ID `15368`; a null or different
+`app_id` is not an equivalent required check.
 
 ## Fail-closed behavior
 
@@ -70,9 +73,10 @@ oversized response.
 
 Issue-comment edit/delete payloads may identify the pull request only by URL and
 omit its head SHA. If the pull-request metadata lookup fails, the bridge reads
-the latest commit metadata from the pull-request commits endpoint and updates or
-creates a non-successful check for that exact SHA. If no trustworthy full SHA can
-be recovered, the workflow fails without claiming success.
+the authoritative GraphQL pull-request metadata field `headRefOid` and updates
+or creates a non-successful check for that exact SHA. It does not infer the head
+from a capped pull-request commits list. If no trustworthy full SHA can be
+recovered, the workflow fails without claiming success.
 
 A new commit is a new review boundary. The old result cannot authorize it. A
 fresh current-head result causes its native review event or the `issue_comment`

@@ -27,7 +27,11 @@ import {
   isTrustedCodexReviewComment,
   parseCodexReviewResult,
 } from "../scripts/codex-review.mjs";
-import { REQUIRED_CONTEXTS } from "../scripts/verify-main-protection.mjs";
+import {
+  hasExpectedCodexReviewBinding,
+  REQUIRED_CHECK_BINDINGS,
+  REQUIRED_CONTEXTS,
+} from "../scripts/verify-main-protection.mjs";
 
 const currentHeadSha = "a".repeat(40);
 const previousHeadSha = "b".repeat(40);
@@ -135,6 +139,16 @@ describe("Codex review protocol", () => {
     ).toBe(undefined);
     expect(parseCodexReviewResult(legacyMarkerBody(currentHeadSha, "PASS"))).toBe(undefined);
     expect(parseCodexReviewResult("PASS")).toBe(undefined);
+    expect(parseCodexReviewResult(NATIVE_CODEX_NO_MAJOR_PREFIX, currentHeadSha)).toEqual({
+      headSha: currentHeadSha,
+      result: "PASS",
+    });
+    expect(
+      parseCodexReviewResult(
+        `${NATIVE_CODEX_NO_MAJOR_PREFIX}\nReviewed commit: not-a-sha`,
+        currentHeadSha,
+      ),
+    ).toBe(undefined);
   });
 
   it("trusts only the observed native Codex publisher identity", () => {
@@ -234,6 +248,32 @@ describe("Codex review protocol", () => {
         pullRequestReviews: [
           nativePullRequestReview({
             body: observedNativeNoMajorBody(previousHeadSha),
+            commit_id: currentHeadSha,
+          }),
+        ],
+        pullRequestReviewComments: [],
+        pullRequest: pullRequest(),
+      }).conclusion,
+    ).toBe("failure");
+    expect(
+      evaluateCodexReview({
+        comments: [],
+        pullRequestReviews: [
+          nativePullRequestReview({
+            body: NATIVE_CODEX_NO_MAJOR_PREFIX,
+            commit_id: currentHeadSha,
+          }),
+        ],
+        pullRequestReviewComments: [],
+        pullRequest: pullRequest(),
+      }).conclusion,
+    ).toBe("success");
+    expect(
+      evaluateCodexReview({
+        comments: [],
+        pullRequestReviews: [
+          nativePullRequestReview({
+            body: `${NATIVE_CODEX_NO_MAJOR_PREFIX}\nReviewed commit: not-a-sha`,
             commit_id: currentHeadSha,
           }),
         ],
@@ -424,6 +464,26 @@ describe("Codex review protocol", () => {
     });
   });
 
+  it("does not let malformed stale review prose poison a current PASS", () => {
+    const decision = evaluateCodexReview({
+      comments: [codexComment()],
+      pullRequestReviews: [
+        nativePullRequestReview({
+          body: `${NATIVE_CODEX_NO_MAJOR_PREFIX}\nReviewed commit: not-a-sha`,
+          commit_id: previousHeadSha,
+        }),
+      ],
+      pullRequestReviewComments: [],
+      pullRequest: pullRequest(),
+    });
+
+    expect(decision).toMatchObject({
+      conclusion: "success",
+      result: "PASS",
+      resultCommentId: "401",
+    });
+  });
+
   it("fails conflicting reviewed-commit bindings closed", () => {
     const conflictingIssue = `${observedNativeNoMajorBody()}\n**Reviewed commit:** \`${previousHeadSha.slice(0, 10)}\``;
     const decision = decisionFor([codexComment({ body: conflictingIssue })]);
@@ -473,6 +533,17 @@ describe("Codex review protocol", () => {
         }),
       }),
     ).toBeUndefined();
+  });
+
+  it("uses authoritative pull-request metadata for URL-only issue-comment events", () => {
+    const issueCommentEvent = {
+      issue: { number: 51, pull_request: { url: "https://api.github.com/pulls/51" } },
+    };
+
+    expect(getFallbackHeadSha(issueCommentEvent, currentHeadSha)).toBe(currentHeadSha);
+    expect(getFallbackHeadSha(issueCommentEvent, previousHeadSha)).toBe(previousHeadSha);
+    expect(getFallbackHeadSha(issueCommentEvent, "not-a-sha")).toBeUndefined();
+    expect(getFallbackHeadSha(issueCommentEvent, [[{ sha: currentHeadSha }]])).toBeUndefined();
   });
 
   it("rejects malformed GitHub pagination instead of discarding it", () => {
@@ -619,6 +690,8 @@ describe("Codex review protocol", () => {
     expect(documentation).toContain("native integration");
     expect(documentation).toContain("@codex review");
     expect(documentation).toContain("pull_request_review_id");
+    expect(documentation).toContain("headRefOid");
+    expect(documentation).not.toContain("pull-request commits endpoint");
     expect(documentation).toContain("MODULE_NOT_FOUND");
     expect(documentation).toContain("bootstrap");
     expect(documentation).toContain("/owner-approve");
@@ -642,6 +715,16 @@ describe("Codex review protocol", () => {
       "Dependency review",
       "Codex review",
     ]);
+    expect(REQUIRED_CHECK_BINDINGS).toEqual([
+      { context: "Codex review", app_id: TRUSTED_GITHUB_ACTIONS_APP_ID },
+    ]);
+    expect(hasExpectedCodexReviewBinding(REQUIRED_CHECK_BINDINGS)).toBe(true);
+    expect(hasExpectedCodexReviewBinding([{ context: "Codex review", app_id: null }])).toBe(false);
+    expect(
+      hasExpectedCodexReviewBinding([
+        { context: "Codex review", app_id: TRUSTED_GITHUB_ACTIONS_APP_ID + 1 },
+      ]),
+    ).toBe(false);
 
     const protectionDocumentation = readFileSync(protectionDocumentationPath, "utf8");
     expect(protectionDocumentation).toContain("Codex review");

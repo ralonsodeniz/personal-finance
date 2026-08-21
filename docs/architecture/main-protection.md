@@ -68,6 +68,10 @@ implementation. The current bridge checkout is trusted `main`; because
 fails with `MODULE_NOT_FOUND` before evaluation. That is a bootstrap blocker,
 not a passing Codex result, and must be resolved by the safe post-merge
 baseline rather than a PR-code checkout or an administrative bypass.
+The structured branch-protection entry for `Codex review` must also carry
+`app_id: 15368` for the GitHub Actions app. A null or different publisher
+binding fails the verifier; this binding is part of the same deferred
+post-bootstrap control-plane update.
 
 ## Operator merge sequence
 
