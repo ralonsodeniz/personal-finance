@@ -284,6 +284,19 @@ describe("Codex review protocol", () => {
     expect(
       evaluateCodexReview({
         comments: [],
+        pullRequestReviews: [
+          nativePullRequestReview({
+            body: `${NATIVE_CODEX_NO_MAJOR_PREFIX}\n**Reviewed commit**: \`${previousHeadSha.slice(0, 10)}\``,
+            commit_id: currentHeadSha,
+          }),
+        ],
+        pullRequestReviewComments: [],
+        pullRequest: pullRequest(),
+      }).conclusion,
+    ).toBe("failure");
+    expect(
+      evaluateCodexReview({
+        comments: [],
         pullRequestReviews: [nativePullRequestReview({ commit_id: undefined })],
         pullRequestReviewComments: [],
         pullRequest: pullRequest(),
