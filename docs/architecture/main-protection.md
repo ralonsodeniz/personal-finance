@@ -63,11 +63,11 @@ expose the previous four-context set. After that successful baseline, explicitly
 add `Codex review` to the live branch-protection rule and rerun
 `pnpm run protection:check`. The current pull request does not run that live
 control-plane assertion, so the deferred mutation does not self-block this
-implementation. The current bridge checkout is trusted `main`; because
-`origin/main` does not yet contain the support script, its pre-bootstrap run
-fails with `MODULE_NOT_FOUND` before evaluation. That is a bootstrap blocker,
-not a passing Codex result, and must be resolved by the safe post-merge
-baseline rather than a PR-code checkout or an administrative bypass.
+implementation. The trusted-main bootstrap is complete: merged PR #53 added the
+workflow to `main`, and merged PR #54 added the parent-review-bound evaluator.
+The current bridge still checks out trusted `main` and never executes
+pull-request code. Any earlier `MODULE_NOT_FOUND` run is historical bootstrap
+evidence, not a current blocker or a passing Codex result.
 The structured branch-protection entry for `Codex review` must also carry
 `app_id: 15368` for the GitHub Actions app. A null or different publisher
 binding fails the verifier; this binding is part of the same deferred

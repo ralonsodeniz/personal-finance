@@ -113,20 +113,20 @@ as a usable required context. The current PR cannot safely bootstrap itself by
 checking out its own support code: that would execute PR-controlled code from
 `pull_request_target`.
 
-At the current PR #52 head, `origin/main` does not contain
-`.github/workflows/codex-review.yml` or `scripts/codex-review.mjs`. The live
-bridge run `32481234507` therefore failed before evaluation with
-`MODULE_NOT_FOUND` for `/home/runner/work/personal-finance/personal-finance/scripts/codex-review.mjs`.
-That failure is not a native review result and must not be represented as a
+The trusted-main bootstrap is complete: merged PR #53 added
+`.github/workflows/codex-review.yml` to `main`, and merged PR #54 added the
+parent-review-bound evaluator in `scripts/codex-review.mjs`. The previous
+`MODULE_NOT_FOUND` run was a historical pre-bootstrap failure, not the current
+bridge state or a native review result, and must never be represented as a
 passing check.
 
 The safe sequence is:
 
-1. Merge the implementation through the existing live four-context protection
-   and Owner approval path; do not use `--admin` or a bypass.
-2. After merge, confirm `main` contains the workflow and support script. On a
-   representative later PR, post one idempotent `@codex review` request for
-   the exact head and observe the native result and a successful bridge check.
+1. Confirm the workflow and evaluator are read from trusted `main`; never
+   check out or execute pull-request code from `pull_request_target`.
+2. On the current or a later pull request, post one idempotent `@codex review`
+   request for the exact head and observe the native result and a successful
+   bridge check.
 3. Only after that successful post-bootstrap baseline should an authorized
    operator add `Codex review` to live `main` protection and rerun
    `pnpm run protection:check`. This issue does not mutate the live rule.

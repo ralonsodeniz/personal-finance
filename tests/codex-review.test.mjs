@@ -816,8 +816,10 @@ describe("Codex review protocol", () => {
     expect(documentation).toContain("pull_request_review_id");
     expect(documentation).toContain("headRefOid");
     expect(documentation).not.toContain("pull-request commits endpoint");
-    expect(documentation).toContain("MODULE_NOT_FOUND");
-    expect(documentation).toContain("bootstrap");
+    expect(documentation).toContain("trusted-main bootstrap is complete");
+    expect(documentation).toContain("merged PR #53");
+    expect(documentation).toContain("merged PR #54");
+    expect(documentation).not.toContain("origin/main does not contain");
     expect(documentation).toContain("/owner-approve");
     expect(documentation).toContain("recovery");
 
@@ -853,7 +855,10 @@ describe("Codex review protocol", () => {
     const protectionDocumentation = readFileSync(protectionDocumentationPath, "utf8");
     expect(protectionDocumentation).toContain("Codex review");
     expect(protectionDocumentation).toContain("@codex review");
-    expect(protectionDocumentation).toContain("MODULE_NOT_FOUND");
+    expect(protectionDocumentation).toContain("trusted-main bootstrap is complete");
+    expect(protectionDocumentation).toContain("merged PR #53");
+    expect(protectionDocumentation).toContain("merged PR #54");
+    expect(protectionDocumentation).not.toContain("origin/main does not yet contain");
     expect(protectionDocumentation).toContain("successful baseline");
     expect(protectionDocumentation).toContain("does not mutate live main protection");
   });
