@@ -67,6 +67,12 @@ bound is treated as an unavailable verification and publishes a non-successful
 current-head result; the workflow does not discard or partially trust an
 oversized response.
 
+Issue-comment edit/delete payloads may identify the pull request only by URL and
+omit its head SHA. If the pull-request metadata lookup fails, the bridge reads
+the latest commit metadata from the pull-request commits endpoint and updates or
+creates a non-successful check for that exact SHA. If no trustworthy full SHA can
+be recovered, the workflow fails without claiming success.
+
 A new commit is a new review boundary. The old result cannot authorize it. A
 fresh current-head result causes its native review event or the `issue_comment`
 event to recompute the gate; historical stale artifacts are never used as the
