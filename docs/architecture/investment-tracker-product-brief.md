@@ -294,7 +294,7 @@ allowlist and does not inherit to a sibling or to an unlisted descendant.
 
 | Authorized Resource | Implicit descendants                                                                                                                       | Visible fields                                                                                                                                                                                                                                            | Hidden from a v1 `view` grant                                                                                                                  |
 | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| Reporting Portfolio | Financial Account summaries                                                                                                                | `id`, `name`, `reportingCurrency`, `totalValue`, `valueAsOf`, `allocation`, `aggregateQuality`, `healthSummary`, `performanceAvailability`                                                                                                                | Financial Account detail and raw source evidence                                                                                               |
+| Reporting Portfolio | Financial Account summaries                                                                                                                | `id`, `name`, `reportingCurrency`, `totalValue`, `valueAsOf`, `allocation`, `aggregateQuality`, `healthSummary.openIssueCount`, `healthSummary.highestSeverity`, `healthSummary.categoryCounts`, `healthSummary.hasMore`, and `performanceAvailability`   | Financial Account detail and raw source evidence                                                                                               |
 | Financial Account   | Holding summaries, the ActivitySummary, ImportBatchSummary, and ReconciliationSummary profiles below, and nested Instrument display fields | `id`, `displayLabel`, `type`, `providerDisplayName`, `latestValue`, `nativeCurrency`, `valueAsOf`, `quality`, `evidenceSummary`, and each Holding's `instrumentDisplayName`, `instrumentType`, `quantity`, `unit`, `value`, `currency`, `valuationState`  | Account numbers, tokens, source rows/files, full Activities, Lots, Tax Basis, and raw Provider Observations                                    |
 | Holding             | Canonical Instrument display fields                                                                                                        | `id`, `instrumentDisplayName`, `instrumentType`, `publicIdentifiers`, `providerAliases`, `quantity`, `unit`, `nativeValue`, `nativeCurrency`, `reportingValue`, `reportingCurrency`, `valuation.sourceDisplayName`, `valuation.asOf`, `valuation.quality` | Standalone Instrument access, full Activities, Corporate Actions, Provenance, Reconciliation detail, Tax Basis, and all raw source evidence    |
 | Activity            | None                                                                                                                                       | `id`, `activityType`, `economicDate`, `settlementDate`, `amount`, `currency`, `state`, and `evidenceSummary`                                                                                                                                              | Counterparty details, credentials, unrelated Resource data, source rows/files, and unredacted source payload                                   |
@@ -335,6 +335,18 @@ direct `view` grant is exercised through the canonical target reads
 `GET /api/v1/instruments/{instrumentId}`. The direct Reconciliation response
 omits `resourceId`; an authorized parent representation may link a target only
 after the target is independently within the same authorized scope.
+
+The Reporting Portfolio `healthSummary` fields above are an aggregate-only
+profile. `categoryCounts` has exactly the categories `staleValuation`,
+`missingEvidence`, `pendingImport`, `reconciliationDiscrepancy`, and
+`calculationUnavailable`; each value is a count. A direct portfolio `view`
+grant never receives a health signal array, affected Resource identifier or
+label, source, as-of date, or next action. The portfolio health route returns
+only this aggregate profile for that grant. An in-Workspace member may receive
+signal detail only for affected Resources that the actor is independently
+authorized to read; other signals remain represented only in the aggregate
+counts. `hasMore` makes truncation explicit without disclosing any hidden
+Resource.
 
 `Tax Basis`, Lots, Corporate Actions, and raw Provider Observations are not
 available through a v1 Resource Grant, including an inherited grant. A
