@@ -16,14 +16,117 @@ application.
 _Avoid_: Login, account
 
 **Financial Account**:
-A financial-domain resource such as a bank, brokerage, cash, or investment
-account; it is not an authentication identity.
+A source-owned financial resource such as a bank account, brokerage account,
+pension plan, or term deposit. It is the boundary at which balances,
+activities, holdings, and valuations belong; it is not an authentication
+identity.
 _Avoid_: User account, login account
 
 **Resource**:
 A typed financial object that belongs to one Workspace and may have explicitly
 defined child resources.
 _Avoid_: Record, item
+
+## Investment tracking
+
+**Instrument**:
+An identifiable financial product or asset that can be held or valued, such as
+a fund, ETF, ETC, or security. Its identity is independent of any one
+provider's symbol or label.
+_Avoid_: Ticker, provider product
+
+**Activity**:
+A dated economic event that changes a Financial Account or explains its income,
+cost, tax, transfer, or corporate action. Contributions, trades, distributions,
+fees, taxes, and transfers are Activities, not interchangeable transaction
+labels.
+_Avoid_: Transaction, movement
+
+**Holding**:
+A current or as-of quantity or value of an Instrument within a Financial
+Account. A Holding may be derived from Activities or supported by a source
+snapshot when activity history is incomplete.
+_Avoid_: Position, when it means the whole account
+
+**Lot**:
+The remaining portion of an acquired Holding together with its acquisition date,
+basis, currency, and lineage. A Lot is evidence for basis and gain reporting,
+not a substitute for a Holding.
+_Avoid_: Unqualified cost basis
+
+**Valuation**:
+A dated observation of an account or Holding's value, quantity, or price,
+including its source and quality. A missing or stale Valuation is an explicit
+data state, not zero.
+_Avoid_: Current value without an as-of date
+
+**Valuation quality**:
+The status of a Valuation, such as confirmed, estimated, stale, missing, or
+manually overridden. It tells a report whether a displayed value is complete
+and current enough for its intended use.
+_Avoid_: Price status
+
+**Reporting Portfolio**:
+A saved, read-only reporting scope over selected Financial Accounts. It groups
+data for analysis without owning, copying, or duplicating the underlying
+balances.
+_Avoid_: Investment account, ledger
+
+**Import Batch**:
+A group of source rows or provider records processed together with their
+source, mapping, review, and outcome. It preserves provenance for manual and
+imported Activities.
+_Avoid_: Upload
+
+**Provenance**:
+The source and history that explain a financial record, including where it came
+from, when it was observed, and how it was corrected or transformed.
+_Avoid_: Metadata
+
+**Reconciliation**:
+A comparison between the app's financial records and external source evidence,
+such as a statement or account snapshot. It records the degree of agreement and
+any discrepancy without silently changing the underlying records.
+_Avoid_: Auto-correction
+
+**Correction**:
+A new linked record that reverses or supersedes an earlier record while
+retaining the original and the reason. Corrections preserve the history of what
+was imported or entered.
+_Avoid_: Edit, when history matters
+
+**External flow**:
+Money or value entering or leaving the selected reporting scope, such as a
+contribution or withdrawal. A transfer between two in-scope Financial Accounts
+is an Internal Transfer instead.
+_Avoid_: Deposit, when scope is unclear
+
+**Internal Transfer**:
+A movement of money or an Instrument between Financial Accounts included in the
+same Reporting Portfolio. It is not investment performance at that scope.
+_Avoid_: Contribution
+
+**Corporate Action**:
+An issuer or plan event that changes an Instrument, its quantity, or its basis,
+such as a split, merger, spin-off, rights issue, or liquidation. It preserves
+lineage and is not assumed to be an ordinary buy or sell.
+_Avoid_: Trade
+
+**Book Cost**:
+Economic capital committed to an asset, tracked separately from a tax
+calculation. Its meaning includes the source and policy used to derive it.
+_Avoid_: Tax basis
+
+**Tax Basis**:
+Basis used for a stated tax jurisdiction and account wrapper. It may be unknown
+or estimated when source history is incomplete, and it is not a promise of tax
+filing or advice.
+_Avoid_: Unqualified cost
+
+**Reporting Currency**:
+The currency in which a Reporting Portfolio presents values. Activities and
+Valuations retain their native amounts and dated conversion evidence.
+_Avoid_: Base currency, when it hides conversion policy
 
 ## Collaboration
 
