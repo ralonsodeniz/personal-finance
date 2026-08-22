@@ -446,11 +446,78 @@ function VariantA({ onSelectHolding }: { onSelectHolding: (holding: Holding) => 
           <span>MWR · +24.11% since first entry</span>
         </div>
         <TrendChart />
-        <div className={styles.aHealthStrip} id="health">
+        <div className={styles.aHealthStrip}>
           <Signal label="Mostly current" tone="good" />
           <span>1 valuation needs attention</span>
-          <a href="#account-deposit">Review it ↗</a>
+          <a href="#health">Review it ↗</a>
         </div>
+      </section>
+
+      <section className={styles.aContextGrid} aria-label="Portfolio context">
+        <article className={styles.aContextCard} id="health" aria-labelledby="a-health-title">
+          <div className={styles.sectionHeader}>
+            <div>
+              <p className={styles.sectionEyebrow}>DATA HEALTH</p>
+              <h2 id="a-health-title">What needs a look</h2>
+            </div>
+            <span className={styles.sectionMeta}>3 open signals</span>
+          </div>
+          <div className={styles.healthList}>
+            <div>
+              <Signal label="stale valuation" tone="warn" />
+              <p>Term deposit last observed 31 Jul 2026.</p>
+            </div>
+            <div>
+              <Signal label="basis incomplete" tone="warn" />
+              <p>Emerging markets needs lot history.</p>
+            </div>
+            <div>
+              <Signal label="import ready" tone="good" />
+              <p>4 rows are ready for review.</p>
+            </div>
+          </div>
+          <a className={styles.textAction} href="#account-deposit">
+            Review open signals ↗
+          </a>
+        </article>
+
+        <article className={styles.aContextCard} aria-labelledby="a-performance-title">
+          <div className={styles.sectionHeader}>
+            <div>
+              <p className={styles.sectionEyebrow}>PERFORMANCE / EXPLAINED</p>
+              <h2 id="a-performance-title">No unlabeled return</h2>
+            </div>
+            <span className={styles.sectionMeta}>since Aug 2025</span>
+          </div>
+          <div className={styles.metricTable} role="table" aria-label="Performance metrics">
+            <div role="row">
+              <span role="cell">Money-weighted return</span>
+              <strong role="cell">+24.11%</strong>
+              <small role="cell">your timing included</small>
+            </div>
+            <div role="row">
+              <span role="cell">Time-weighted return</span>
+              <strong role="cell">+19.01%</strong>
+              <small role="cell">comparison view</small>
+            </div>
+            <div role="row">
+              <span role="cell">Recorded income</span>
+              <strong role="cell">+€638</strong>
+              <small role="cell">dividends + interest</small>
+            </div>
+            <div role="row">
+              <span role="cell">Recorded costs</span>
+              <strong role="cell">−€41</strong>
+              <small role="cell">fees + commissions</small>
+            </div>
+          </div>
+          <p className={styles.aMethodNote}>
+            Every figure names its method, period, and cash-flow treatment.
+          </p>
+          <a className={styles.textAction} href="#a-allocation-title">
+            View reporting scope ↗
+          </a>
+        </article>
       </section>
 
       <section className={styles.aSection} aria-labelledby="a-accounts-title">
@@ -492,7 +559,7 @@ function VariantA({ onSelectHolding }: { onSelectHolding: (holding: Holding) => 
         <span className={styles.routeGlyph} aria-hidden="true">
           ●···○
         </span>
-        <p>One page, one reporting scope. The detail waits until you ask for it.</p>
+        <p>One overview, multiple trails. Follow any number back to its evidence.</p>
       </section>
     </main>
   );

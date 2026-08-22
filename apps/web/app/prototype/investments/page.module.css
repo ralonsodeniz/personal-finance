@@ -391,6 +391,54 @@
   text-transform: uppercase;
 }
 
+.aContextGrid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: clamp(2.5rem, 6vw, 5rem);
+}
+
+.aContextCard {
+  background: color-mix(in srgb, var(--prototype-paper) 80%, transparent);
+  border: 1px solid color-mix(in srgb, var(--prototype-ink) 15%, transparent);
+  border-radius: 1.6rem 0.4rem 1.6rem 0.4rem;
+  padding: clamp(1.25rem, 3vw, 2rem);
+}
+
+.aContextCard .healthList {
+  margin-top: 1.5rem;
+}
+
+.aContextCard .textAction {
+  display: inline-block;
+  margin-top: 1.35rem;
+}
+
+.aContextCard .metricTable {
+  margin-top: 1rem;
+}
+
+.aContextCard .metricTable > div {
+  gap: 0.6rem;
+  grid-template-columns: minmax(0, 1fr) auto;
+  min-height: 3.4rem;
+  padding: 0.75rem 0;
+}
+
+.aContextCard .metricTable small {
+  grid-column: 1 / -1;
+  text-align: left;
+}
+
+.aMethodNote {
+  color: color-mix(in srgb, var(--prototype-ink) 58%, transparent);
+  font-family: var(--font-utility);
+  font-size: 0.64rem;
+  letter-spacing: 0.03em;
+  line-height: 1.45;
+  margin: 1rem 0 0;
+}
+
 .aSection {
   border-top: 1px solid color-mix(in srgb, var(--prototype-ink) 15%, transparent);
   margin-top: clamp(3.5rem, 8vw, 7rem);
@@ -1125,6 +1173,15 @@
 
   .aHeroStats span + span::before {
     content: none;
+  }
+
+  .aContextGrid {
+    display: block;
+    margin-top: 2.5rem;
+  }
+
+  .aContextCard + .aContextCard {
+    margin-top: 1rem;
   }
 
   .sectionHeader,
