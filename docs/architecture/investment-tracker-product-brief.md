@@ -23,8 +23,8 @@ The investment tracker uses the A+ hierarchy from the mobile prototype:
 4. Financial Account, Holding, Activity, allocation, and detailed performance
    views remain available through progressive disclosure.
 
-The overview is an orientation layer. It is not the complete ledger and it
-does not replace source evidence. The prototype decision is recorded on
+The overview is an orientation layer. It is not the complete source history
+and does not replace source evidence. The prototype decision is recorded on
 [Mobile-First Investment Overview and Drill-Down Prototype](https://github.com/ralonsodeniz/personal-finance/issues/59).
 
 ## Goals
@@ -58,7 +58,7 @@ The product uses the vocabulary and boundaries in
 and [ADR 0002](../adr/0002-manual-first-provider-strategy.md).
 
 - A **Financial Account** owns source balances, Activities, Holdings, Lots, and
-  Valuations. It is not a login identity.
+  Valuations. It is not an authentication identity.
 - An **Instrument** is canonical across Providers. A provider symbol or label
   is an alias, not the product identity.
 - An **Activity** is the dated economic event model. Contributions, trades,
@@ -203,6 +203,36 @@ Loading, empty, permission, offline, and server-error states use the same
 labels and retain the last known as-of date where it is safe to do so. A stale
 value and an unavailable value are never represented by the same color alone.
 
+## Reporting policy defaults
+
+The v1 defaults follow the accepted [Investment reporting policy
+defaults](https://github.com/ralonsodeniz/personal-finance/issues/71):
+
+- Market-price Valuations are stale after three market sessions, or after seven
+  calendar days when market-session data is unavailable.
+- Daily fund or index NAVs are stale after five business days.
+- Statement-based Financial Account, pension, and term-deposit values are stale
+  after 45 calendar days.
+- An unknown source cadence is stale after 30 calendar days.
+- A stale value retains its last confirmed value and never becomes zero.
+- Term-deposit accrual is Estimated only when principal, rate, dates, and the
+  method are explicit. Pension accrual uses a product-specific method.
+  Estimated accrual is excluded from the confirmed headline. Missing terms are
+  Not available or Not computable.
+- Benchmarks are absent unless the user explicitly selects one.
+- Corporate Actions are not inferred as ordinary trades. Source evidence is
+  preserved and review is required. Dependent basis or performance remains Not
+  computable until its lineage is fixed.
+- FX uses dated Provider Observations. Valuations use the valuation date and
+  Activities use the economic Activity date. The latest prior observation is
+  usable only within five business days. Native amounts remain visible, and
+  missing dated FX makes the Reporting Currency metric Not computable.
+- Reconciliation tolerates only rounding within source precision or a minor
+  currency unit. A larger discrepancy blocks Confirmed status and does not
+  auto-correct.
+- Tax views are Not computable when Tax Basis or account-wrapper evidence is
+  missing. Book Cost remains a separate non-tax view.
+
 ## Read-model and contract boundary
 
 The web/PWA and future Expo client need stable, purpose-built read models. They
@@ -211,24 +241,29 @@ must not consume Drizzle rows or server domain objects directly.
 The first contract set should cover these representations:
 
 ```text
-GET /v1/reporting-portfolios/{reportingPortfolioId}/overview
-GET /v1/reporting-portfolios/{reportingPortfolioId}/health
-GET /v1/reporting-portfolios/{reportingPortfolioId}/accounts
-GET /v1/reporting-portfolios/{reportingPortfolioId}/holdings/{holdingId}
-GET /v1/reporting-portfolios/{reportingPortfolioId}/performance
-GET /v1/reporting-portfolios/{reportingPortfolioId}/activity
-POST /v1/reporting-portfolios/{reportingPortfolioId}/import-batches
-GET /v1/import-batches/{importBatchId}
-POST /v1/import-batches/{importBatchId}/review
-POST /v1/financial-accounts
-POST /v1/instruments
-POST /v1/valuations
-POST /v1/activities
+GET /api/v1/reporting-portfolios/{reportingPortfolioId}/overview
+GET /api/v1/reporting-portfolios/{reportingPortfolioId}/health
+GET /api/v1/reporting-portfolios/{reportingPortfolioId}/accounts
+GET /api/v1/reporting-portfolios/{reportingPortfolioId}/holdings/{holdingId}
+GET /api/v1/reporting-portfolios/{reportingPortfolioId}/performance
+GET /api/v1/reporting-portfolios/{reportingPortfolioId}/activity
+POST /api/v1/reporting-portfolios/{reportingPortfolioId}/import-batches
+GET /api/v1/import-batches/{importBatchId}
+POST /api/v1/import-batches/{importBatchId}/review
+POST /api/v1/financial-accounts
+POST /api/v1/instruments
+POST /api/v1/valuations
+POST /api/v1/activities
 ```
 
 These paths are a starting boundary for contract design. They do not authorize
 an implementation to skip resource-level authorization, pagination, idempotency,
 conditional writes, or privacy-safe cache headers.
+
+The application layer applies Reporting Portfolio scope, Resource-level
+authorization, and Field visibility before route serialization, caching, or
+generated-client responses. An authorized Resource does not automatically make
+every field visible.
 
 ### Overview representation
 
@@ -289,6 +324,16 @@ product analytics, or error telemetry.
   reconciled states.
 - Add application read models behind provider-free fake adapters.
 - Confirm money, native currency, dated FX, date range, and enum serialization.
+- Add contract tests for runtime schemas, OpenAPI examples, Problem Details,
+  and generated-client reproducibility.
+- Add application tests for scope, evidence quality, calculation availability,
+  policy defaults, and Field visibility.
+- Add route tests for validation, authorization, serialization, cache behavior,
+  unsupported methods, and Problem Details errors.
+- Add web tests for accessible content, mobile layout, loading and error states,
+  detail navigation, and chart table alternatives.
+- Add one mobile-sized Playwright journey covering overview, health review,
+  detail navigation, and a manual-entry or import outcome.
 
 ### Phase 1: manual and file-based v1
 

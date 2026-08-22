@@ -118,9 +118,10 @@ calculation. Its meaning includes the source and policy used to derive it.
 _Avoid_: Tax basis
 
 **Tax Basis**:
-Basis used for a stated tax jurisdiction and account wrapper. It may be unknown
-or estimated when source history is incomplete, and it is not a promise of tax
-filing or advice.
+Basis used for a stated tax jurisdiction and account wrapper. It is Not
+computable when the jurisdiction, wrapper, or source evidence is missing. It
+may be estimated only under an explicit method, remains separate from Book
+Cost, and is not tax filing or advice.
 _Avoid_: Unqualified cost
 
 **Reporting Currency**:
