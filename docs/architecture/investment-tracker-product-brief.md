@@ -246,6 +246,7 @@ GET /api/v1/reporting-portfolios/{reportingPortfolioId}/health
 GET /api/v1/reporting-portfolios/{reportingPortfolioId}/accounts
 GET /api/v1/reporting-portfolios/{reportingPortfolioId}/accounts/{financialAccountId}
 PUT /api/v1/reporting-portfolios/{reportingPortfolioId}/accounts/{financialAccountId}
+DELETE /api/v1/reporting-portfolios/{reportingPortfolioId}/accounts/{financialAccountId}
 GET /api/v1/reporting-portfolios/{reportingPortfolioId}/holdings/{holdingId}
 GET /api/v1/reporting-portfolios/{reportingPortfolioId}/performance
 GET /api/v1/reporting-portfolios/{reportingPortfolioId}/activity
@@ -297,12 +298,19 @@ allowlist and does not inherit to a sibling or to an unlisted descendant.
 | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------- |
 | Reporting Portfolio | Financial Account summaries                                                                                                                | `id`, `name`, `reportingCurrency`, `totalValue`, `valueAsOf`, `allocation.segments`, `allocation.targetState`, `aggregateQuality`, `healthSummary.openIssueCount`, `healthSummary.highestSeverity`, `healthSummary.categoryCounts`, `healthSummary.hasMore`, and `performanceAvailability` | Financial Account detail and raw source evidence                                                                                               |
 | Financial Account   | Holding summaries, the ActivitySummary, ImportBatchSummary, and ReconciliationSummary profiles below, and nested Instrument display fields | `id`, `displayLabel`, `type`, `providerDisplayName`, `latestValue`, `nativeCurrency`, `valueAsOf`, `quality`, `evidenceSummary`, and each Holding's `instrumentDisplayName`, `instrumentType`, `quantity`, `unit`, `value`, `currency`, `valuationState`                                   | Account numbers, tokens, source rows/files, full Activities, Lots, Tax Basis, and raw Provider Observations                                    |
-| Holding             | Canonical Instrument display fields                                                                                                        | `id`, `instrumentDisplayName`, `instrumentType`, `publicIdentifiers`, `providerAliases`, `quantity`, `unit`, `nativeValue`, `nativeCurrency`, `reportingValue`, `reportingCurrency`, `valuation.sourceDisplayName`, `valuation.asOf`, `valuation.quality`                                  | Standalone Instrument access, full Activities, Corporate Actions, Provenance, Reconciliation detail, Tax Basis, and all raw source evidence    |
+| Holding             | Canonical Instrument display fields                                                                                                        | `id`, `instrumentDisplayName`, `instrumentType`, `publicIdentifiers[]`, `providerAliases[]`, `quantity`, `unit`, `nativeValue`, `nativeCurrency`, `reportingValue`, `reportingCurrency`, `valuation.sourceDisplayName`, `valuation.asOf`, `valuation.quality`                              | Standalone Instrument access, full Activities, Corporate Actions, Provenance, Reconciliation detail, Tax Basis, and all raw source evidence    |
 | Activity            | None                                                                                                                                       | `id`, `activityType`, `economicDate`, `settlementDate`, `amount`, `currency`, `state`, and `evidenceSummary`                                                                                                                                                                               | Counterparty details, credentials, unrelated Resource data, source rows/files, and unredacted source payload                                   |
 | Valuation           | None                                                                                                                                       | `id`, `asOf`, `value`, `quantity`, `unitPrice`, `currency`, `state`, and `evidenceSummary`                                                                                                                                                                                                 | Credentials, unrelated Resource data, raw Provider Observations, source rows/files, and unredacted source payload                              |
 | Import Batch        | None                                                                                                                                       | `id`, `status`, `receivedAt`, `sourceAsOf`, `reviewState`, `rowCounts.pending`, `rowCounts.mapped`, `rowCounts.duplicate`, `rowCounts.rejected`, and `evidenceSummary`                                                                                                                     | Source filename/content, source rows/files, credentials, mapped canonical records outside the grant, and unredacted source payload             |
 | Reconciliation      | None                                                                                                                                       | `id`, `resourceType`, `asOf`, `state`, `applicationValue`, `sourceValue`, `difference`, `currency`, and `evidenceSummary`                                                                                                                                                                  | Target Resource identifiers, credentials, unrelated Resource data, source rows/files, raw Provider Observations, and unredacted source payload |
-| Instrument          | None                                                                                                                                       | `id`, `displayName`, `type`, `publicIdentifiers`, and `providerAliases`                                                                                                                                                                                                                    | Account ownership, quantities, holdings, and source-specific account evidence                                                                  |
+| Instrument          | None                                                                                                                                       | `id`, `displayName`, `type`, `publicIdentifiers[]`, and `providerAliases[]`                                                                                                                                                                                                                | Account ownership, quantities, holdings, and source-specific account evidence                                                                  |
+
+The nested Instrument metadata is fixed as well. Each
+`publicIdentifiers[]` item contains exactly `scheme` and `value`. Each
+`providerAliases[]` item contains exactly `providerDisplayName`, `label`, and
+`symbol`. Neither shape may contain a Provider account identifier, source-row
+identifier, credential, account ownership, holding quantity, or raw Provider
+metadata.
 
 The inherited summary profiles are fixed and separate from direct target
 representations:
@@ -406,6 +414,12 @@ Problem Details response and performs no write.
 Import operations return an Import Batch identifier and review state; the
 review surface reads the batch and applies accepted mappings through the
 canonical Activity model. `POST
+/api/v1/import-batches/{importBatchId}/review` requires an expected current
+version, supplied as `If-Match` or the operation's version field. A stale
+version fails with a precondition Problem Details response and performs no
+mapping or Activity write.
+
+`POST
 /api/v1/reconciliations/{reconciliationId}/review` also requires an expected
 current version. Its request records one explicit decision—`acceptSource`,
 `retainApplicationValue`, `markIntentionallyUnchanged`, or
@@ -424,8 +438,10 @@ operation reverses or supersedes an existing record.
 Creating a Financial Account does not implicitly change any Reporting
 Portfolio. The manual-entry flow explicitly calls the idempotent `PUT
 /api/v1/reporting-portfolios/{reportingPortfolioId}/accounts/{financialAccountId}`
-membership operation after creation; its response reports the resulting
-selection state. The membership operation is authorized only when the
+membership operation after creation to select the account. A matching
+idempotent `DELETE` deselects the account without deleting the Financial
+Account, its Activities, or its evidence. Both operations return the resulting
+selection state. The membership operations are authorized only when the
 Reporting Portfolio and Financial Account resolve to the same `workspaceId`
 and the acting user has an active `owner` or `editor` Membership in that
 Workspace. A `ResourceGrant`—which is `view`-only in v1—cannot authorize this
@@ -475,8 +491,9 @@ product analytics, or error telemetry.
   authorization.
 - Add route tests for validation, authorization, serialization, cache behavior,
   idempotency replay and key-reuse for every retryable `POST`,
-  reconciliation-review append-only Correction results, unsupported methods,
-  and Problem Details errors.
+  Import Batch and reconciliation version preconditions, append-only
+  Correction results, portfolio selection and deselection, unsupported
+  methods, and Problem Details errors.
 - Add web tests for accessible content, mobile layout, loading and error states,
   detail navigation, and chart table alternatives.
 - Add one mobile-sized Playwright journey covering overview, health review,
