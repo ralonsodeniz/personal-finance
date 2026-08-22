@@ -254,7 +254,7 @@ GET /api/v1/financial-accounts/{financialAccountId}
 GET /api/v1/holdings/{holdingId}
 GET /api/v1/activities/{activityId}
 GET /api/v1/valuations/{valuationId}
-POST /api/v1/reporting-portfolios/{reportingPortfolioId}/import-batches
+POST /api/v1/reporting-portfolios/{reportingPortfolioId}/accounts/{financialAccountId}/import-batches
 GET /api/v1/import-batches/{importBatchId}
 GET /api/v1/reconciliations/{reconciliationId}
 GET /api/v1/instruments/{instrumentId}
@@ -263,7 +263,7 @@ POST /api/v1/reconciliations/{reconciliationId}/review
 POST /api/v1/financial-accounts
 POST /api/v1/instruments
 POST /api/v1/valuations
-POST /api/v1/activities
+POST /api/v1/financial-accounts/{financialAccountId}/activities
 ```
 
 These paths are a starting boundary for contract design. They do not authorize
@@ -445,7 +445,12 @@ Problem Details response and performs no write.
 
 Import operations return an Import Batch identifier and review state; the
 review surface reads the batch and applies accepted mappings through the
-canonical Activity model. `POST
+canonical Activity model. Import Batch creation is nested under
+`/api/v1/reporting-portfolios/{reportingPortfolioId}/accounts/{financialAccountId}/import-batches`.
+The server requires that the Financial Account belongs to the same Workspace,
+is selected in the Reporting Portfolio, and is writable by the actor; the
+Import Batch and all accepted canonical Activities retain that account target.
+`POST
 /api/v1/import-batches/{importBatchId}/review` requires an expected current
 version, supplied as `If-Match` or the operation's version field. A stale
 version fails with a precondition Problem Details response and performs no
@@ -464,17 +469,29 @@ typed `correctionPayload`, which is one of:
 The payload's target is bound to the Reconciliation by the server and is not
 client-selectable. The other decisions must omit `correctionPayload`. Its
 shape is validated against the Reconciliation target before the append-only
-Correction is created. The response always returns the resulting
-`reconciliationId` and review `state`; `correctionId` is returned when the
-decision appends a Correction and is `null` otherwise. The original evidence
-remains unchanged, and a retry with the same idempotency key returns the
-original identifiers and state.
+Correction is created. Decision effects are fixed: `acceptSource` derives a
+source-valued Correction from the stored source evidence, applies it in the
+canonical read model, changes Reconciliation `state` to `resolved`, and
+requires a non-null `correctionId`; `retainApplicationValue` records the
+decision without changing the canonical value and changes `state` to
+`acknowledged`; `markIntentionallyUnchanged` records the decision without a
+Correction and changes `state` to `acknowledged`; `createCorrection` appends
+the typed Correction, applies it in the canonical read model, changes `state`
+to `resolved`, and requires a non-null `correctionId`. The response always
+returns the resulting `reconciliationId` and review `state`, while
+`correctionId` is `null` for the two no-Correction decisions. The original
+evidence remains unchanged, and a retry with the same idempotency key returns
+the original identifiers and state.
 
 Manual-entry create operations are distinct from imports and Corrections:
-creating a Financial Account, Instrument, Valuation, or Activity returns that
-canonical resource's identifier and representation or location, along with
-its evidence state. A Correction identifier is returned only when the
-operation reverses or supersedes an existing record.
+creating a Financial Account, Instrument, or Valuation returns that canonical
+resource's identifier and representation or location, along with its evidence
+state. Manual Activity creation uses
+`POST /api/v1/financial-accounts/{financialAccountId}/activities`; the path
+binds the Activity to its Financial Account, and the server requires the
+actor's write access to that account's Workspace. It cannot create an orphan
+or cross-Workspace Activity. A Correction identifier is returned only when
+the operation reverses or supersedes an existing record.
 
 Creating a Financial Account does not implicitly change any Reporting
 Portfolio. The manual-entry flow explicitly calls the idempotent `PUT
@@ -534,8 +551,9 @@ product analytics, or error telemetry.
 - Add route tests for validation, authorization, serialization, cache behavior,
   idempotency replay and key-reuse for every retryable `POST`,
   Import Batch and reconciliation version preconditions, append-only
-  Correction payload validation and results, portfolio selection and
-  deselection, unsupported methods, and Problem Details errors.
+  Correction payload validation and decision results, account-bound imports
+  and Activities, portfolio selection and deselection, unsupported methods,
+  and Problem Details errors.
 - Add web tests for accessible content, mobile layout, loading and error states,
   detail navigation, and chart table alternatives.
 - Add one mobile-sized Playwright journey covering overview, health review,
