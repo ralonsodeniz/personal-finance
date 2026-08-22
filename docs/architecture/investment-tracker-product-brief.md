@@ -258,6 +258,7 @@ GET /api/v1/import-batches/{importBatchId}
 GET /api/v1/reconciliations/{reconciliationId}
 GET /api/v1/instruments/{instrumentId}
 POST /api/v1/import-batches/{importBatchId}/review
+POST /api/v1/reconciliations/{reconciliationId}/review
 POST /api/v1/financial-accounts
 POST /api/v1/instruments
 POST /api/v1/valuations
@@ -292,16 +293,16 @@ contains a credential, raw Provider Observation, source row, source file, or
 unredacted account identifier. A direct `view` grant uses the target resource's
 allowlist and does not inherit to a sibling or to an unlisted descendant.
 
-| Authorized Resource | Implicit descendants                                                                                                                       | Visible fields                                                                                                                                                                                                                                            | Hidden from a v1 `view` grant                                                                                                                  |
-| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| Reporting Portfolio | Financial Account summaries                                                                                                                | `id`, `name`, `reportingCurrency`, `totalValue`, `valueAsOf`, `allocation`, `aggregateQuality`, `healthSummary.openIssueCount`, `healthSummary.highestSeverity`, `healthSummary.categoryCounts`, `healthSummary.hasMore`, and `performanceAvailability`   | Financial Account detail and raw source evidence                                                                                               |
-| Financial Account   | Holding summaries, the ActivitySummary, ImportBatchSummary, and ReconciliationSummary profiles below, and nested Instrument display fields | `id`, `displayLabel`, `type`, `providerDisplayName`, `latestValue`, `nativeCurrency`, `valueAsOf`, `quality`, `evidenceSummary`, and each Holding's `instrumentDisplayName`, `instrumentType`, `quantity`, `unit`, `value`, `currency`, `valuationState`  | Account numbers, tokens, source rows/files, full Activities, Lots, Tax Basis, and raw Provider Observations                                    |
-| Holding             | Canonical Instrument display fields                                                                                                        | `id`, `instrumentDisplayName`, `instrumentType`, `publicIdentifiers`, `providerAliases`, `quantity`, `unit`, `nativeValue`, `nativeCurrency`, `reportingValue`, `reportingCurrency`, `valuation.sourceDisplayName`, `valuation.asOf`, `valuation.quality` | Standalone Instrument access, full Activities, Corporate Actions, Provenance, Reconciliation detail, Tax Basis, and all raw source evidence    |
-| Activity            | None                                                                                                                                       | `id`, `activityType`, `economicDate`, `settlementDate`, `amount`, `currency`, `state`, and `evidenceSummary`                                                                                                                                              | Counterparty details, credentials, unrelated Resource data, source rows/files, and unredacted source payload                                   |
-| Valuation           | None                                                                                                                                       | `id`, `asOf`, `value`, `quantity`, `unitPrice`, `currency`, `state`, and `evidenceSummary`                                                                                                                                                                | Credentials, unrelated Resource data, raw Provider Observations, source rows/files, and unredacted source payload                              |
-| Import Batch        | None                                                                                                                                       | `id`, `status`, `receivedAt`, `sourceAsOf`, `reviewState`, `rowCounts.pending`, `rowCounts.mapped`, `rowCounts.duplicate`, `rowCounts.rejected`, and `evidenceSummary`                                                                                    | Source filename/content, source rows/files, credentials, mapped canonical records outside the grant, and unredacted source payload             |
-| Reconciliation      | None                                                                                                                                       | `id`, `resourceType`, `asOf`, `state`, `applicationValue`, `sourceValue`, `difference`, `currency`, and `evidenceSummary`                                                                                                                                 | Target Resource identifiers, credentials, unrelated Resource data, source rows/files, raw Provider Observations, and unredacted source payload |
-| Instrument          | None                                                                                                                                       | `id`, `displayName`, `type`, `publicIdentifiers`, and `providerAliases`                                                                                                                                                                                   | Account ownership, quantities, holdings, and source-specific account evidence                                                                  |
+| Authorized Resource | Implicit descendants                                                                                                                       | Visible fields                                                                                                                                                                                                                                                                             | Hidden from a v1 `view` grant                                                                                                                  |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| Reporting Portfolio | Financial Account summaries                                                                                                                | `id`, `name`, `reportingCurrency`, `totalValue`, `valueAsOf`, `allocation.segments`, `allocation.targetState`, `aggregateQuality`, `healthSummary.openIssueCount`, `healthSummary.highestSeverity`, `healthSummary.categoryCounts`, `healthSummary.hasMore`, and `performanceAvailability` | Financial Account detail and raw source evidence                                                                                               |
+| Financial Account   | Holding summaries, the ActivitySummary, ImportBatchSummary, and ReconciliationSummary profiles below, and nested Instrument display fields | `id`, `displayLabel`, `type`, `providerDisplayName`, `latestValue`, `nativeCurrency`, `valueAsOf`, `quality`, `evidenceSummary`, and each Holding's `instrumentDisplayName`, `instrumentType`, `quantity`, `unit`, `value`, `currency`, `valuationState`                                   | Account numbers, tokens, source rows/files, full Activities, Lots, Tax Basis, and raw Provider Observations                                    |
+| Holding             | Canonical Instrument display fields                                                                                                        | `id`, `instrumentDisplayName`, `instrumentType`, `publicIdentifiers`, `providerAliases`, `quantity`, `unit`, `nativeValue`, `nativeCurrency`, `reportingValue`, `reportingCurrency`, `valuation.sourceDisplayName`, `valuation.asOf`, `valuation.quality`                                  | Standalone Instrument access, full Activities, Corporate Actions, Provenance, Reconciliation detail, Tax Basis, and all raw source evidence    |
+| Activity            | None                                                                                                                                       | `id`, `activityType`, `economicDate`, `settlementDate`, `amount`, `currency`, `state`, and `evidenceSummary`                                                                                                                                                                               | Counterparty details, credentials, unrelated Resource data, source rows/files, and unredacted source payload                                   |
+| Valuation           | None                                                                                                                                       | `id`, `asOf`, `value`, `quantity`, `unitPrice`, `currency`, `state`, and `evidenceSummary`                                                                                                                                                                                                 | Credentials, unrelated Resource data, raw Provider Observations, source rows/files, and unredacted source payload                              |
+| Import Batch        | None                                                                                                                                       | `id`, `status`, `receivedAt`, `sourceAsOf`, `reviewState`, `rowCounts.pending`, `rowCounts.mapped`, `rowCounts.duplicate`, `rowCounts.rejected`, and `evidenceSummary`                                                                                                                     | Source filename/content, source rows/files, credentials, mapped canonical records outside the grant, and unredacted source payload             |
+| Reconciliation      | None                                                                                                                                       | `id`, `resourceType`, `asOf`, `state`, `applicationValue`, `sourceValue`, `difference`, `currency`, and `evidenceSummary`                                                                                                                                                                  | Target Resource identifiers, credentials, unrelated Resource data, source rows/files, raw Provider Observations, and unredacted source payload |
+| Instrument          | None                                                                                                                                       | `id`, `displayName`, `type`, `publicIdentifiers`, and `providerAliases`                                                                                                                                                                                                                    | Account ownership, quantities, holdings, and source-specific account evidence                                                                  |
 
 The inherited summary profiles are fixed and separate from direct target
 representations:
@@ -348,6 +349,15 @@ authorized to read; other signals remain represented only in the aggregate
 counts. `hasMore` makes truncation explicit without disclosing any hidden
 Resource.
 
+The Reporting Portfolio `allocation` fields above are also aggregate-only.
+`allocation.segments` is an array whose items contain exactly `assetClass`,
+`reportingValue`, `percentage`, and `state`. `allocation.targetState` is one
+of `configured`, `notConfigured`, or `notComputable`. A segment never contains
+an Account, Holding, Instrument, Provider, source, or stable Resource
+identifier. Direct portfolio grants therefore receive allocation totals and
+labels only; detail or target changes require an independently authorized
+resource operation.
+
 `Tax Basis`, Lots, Corporate Actions, and raw Provider Observations are not
 available through a v1 Resource Grant, including an inherited grant. A
 same-Workspace member view may include Tax Basis only in a purpose-built tax
@@ -376,14 +386,24 @@ The overview read model should contain:
 
 ### Mutations
 
-Retryable import and manual-entry mutations should be idempotent. Import
-operations return an Import Batch identifier and review state; the review
-surface reads the batch and applies accepted mappings through the canonical
-Activity model. Manual-entry create operations are distinct from imports and
-Corrections: creating a Financial Account, Instrument, Valuation, or Activity
-returns that canonical resource's identifier and representation or location,
-along with its evidence state. A Correction identifier is returned only when
-the operation reverses or supersedes an existing record.
+Retryable import, reconciliation-review, and manual-entry mutations should be
+idempotent. Import operations return an Import Batch identifier and review
+state; the review surface reads the batch and applies accepted mappings
+through the canonical Activity model. `POST
+/api/v1/reconciliations/{reconciliationId}/review` requires an
+`Idempotency-Key` and an expected current version. Its request records one
+explicit decision—`acceptSource`, `retainApplicationValue`,
+`markIntentionallyUnchanged`, or `createCorrection`—plus a reason. Its
+response always returns the resulting `reconciliationId` and review `state`;
+`correctionId` is returned when the decision appends a Correction and is
+`null` otherwise. The original evidence remains unchanged, and a retry with
+the same idempotency key returns the original identifiers and state.
+
+Manual-entry create operations are distinct from imports and Corrections:
+creating a Financial Account, Instrument, Valuation, or Activity returns that
+canonical resource's identifier and representation or location, along with
+its evidence state. A Correction identifier is returned only when the
+operation reverses or supersedes an existing record.
 
 Creating a Financial Account does not implicitly change any Reporting
 Portfolio. The manual-entry flow explicitly calls the idempotent `PUT
@@ -438,6 +458,7 @@ product analytics, or error telemetry.
   policy defaults, the field allowlists above, and cross-Workspace membership
   authorization.
 - Add route tests for validation, authorization, serialization, cache behavior,
+  reconciliation-review idempotency, append-only Correction results,
   unsupported methods, and Problem Details errors.
 - Add web tests for accessible content, mobile layout, loading and error states,
   detail navigation, and chart table alternatives.
