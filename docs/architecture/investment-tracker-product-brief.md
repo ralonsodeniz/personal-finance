@@ -317,8 +317,13 @@ representations:
   `value`, `currency`, and `valuationState`; this is the same summary shape
   listed in the Financial Account row.
 - A Financial Account may inherit an `ActivitySummary` with exactly
-  `recordCount`, `latestEconomicDate`, `incomeTotal`, `costTotal`,
-  `externalFlowTotal`, `stateCounts`, and `evidenceSummary.quality`.
+  `recordCount`, `periodStart`, `periodEnd`, `reportingCurrency`,
+  `incomeTotal`, `costTotal`, `externalFlowTotal`, `stateCounts`, and
+  `evidenceSummary.quality`. Each total is an array of `MoneySummary` items;
+  each item contains exactly `amount`, `currency`, `reportingAmount`,
+  `reportingCurrency`, and `fxState`. `reportingAmount` is `null` when
+  `fxState` is `missing` or `notComputable`; `fxState` uses the shared
+  `Confirmed`, `Stale`, `Estimated`, `Missing`, or `Not computable` states.
 - A Financial Account may inherit an `ImportBatchSummary` with exactly
   `batchCount`, `latestReceivedAt`, `pendingRowCount`, `reviewState`, and
   `evidenceSummary.quality`.
@@ -386,18 +391,27 @@ The overview read model should contain:
 
 ### Mutations
 
-Retryable import, reconciliation-review, and manual-entry mutations should be
-idempotent. Import operations return an Import Batch identifier and review
-state; the review surface reads the batch and applies accepted mappings
-through the canonical Activity model. `POST
-/api/v1/reconciliations/{reconciliationId}/review` requires an
-`Idempotency-Key` and an expected current version. Its request records one
-explicit decision—`acceptSource`, `retainApplicationValue`,
-`markIntentionallyUnchanged`, or `createCorrection`—plus a reason. Its
-response always returns the resulting `reconciliationId` and review `state`;
-`correctionId` is returned when the decision appends a Correction and is
-`null` otherwise. The original evidence remains unchanged, and a retry with
-the same idempotency key returns the original identifiers and state.
+Every retryable `POST` mutation in this contract requires an
+`Idempotency-Key`: import-batch creation, Import Batch review,
+reconciliation review, and manual Financial Account, Instrument, Valuation,
+and Activity creation. The key is scoped to the authenticated user, route,
+and target Workspace. The server stores the request fingerprint and completed
+response; a retry with the same key and body returns the original status,
+identifiers, representation, and state without creating another resource. A
+same key with a different body or target fails with an idempotency-key-reuse
+Problem Details response and performs no write.
+
+Import operations return an Import Batch identifier and review state; the
+review surface reads the batch and applies accepted mappings through the
+canonical Activity model. `POST
+/api/v1/reconciliations/{reconciliationId}/review` also requires an expected
+current version. Its request records one explicit decision—`acceptSource`,
+`retainApplicationValue`, `markIntentionallyUnchanged`, or
+`createCorrection`—plus a reason. Its response always returns the resulting
+`reconciliationId` and review `state`; `correctionId` is returned when the
+decision appends a Correction and is `null` otherwise. The original evidence
+remains unchanged, and a retry with the same idempotency key returns the
+original identifiers and state.
 
 Manual-entry create operations are distinct from imports and Corrections:
 creating a Financial Account, Instrument, Valuation, or Activity returns that
@@ -458,8 +472,9 @@ product analytics, or error telemetry.
   policy defaults, the field allowlists above, and cross-Workspace membership
   authorization.
 - Add route tests for validation, authorization, serialization, cache behavior,
-  reconciliation-review idempotency, append-only Correction results,
-  unsupported methods, and Problem Details errors.
+  idempotency replay and key-reuse for every retryable `POST`,
+  reconciliation-review append-only Correction results, unsupported methods,
+  and Problem Details errors.
 - Add web tests for accessible content, mobile layout, loading and error states,
   detail navigation, and chart table alternatives.
 - Add one mobile-sized Playwright journey covering overview, health review,
