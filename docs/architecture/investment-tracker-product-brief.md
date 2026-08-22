@@ -322,8 +322,10 @@ representations:
   `evidenceSummary.quality`. Each total is an array of `MoneySummary` items;
   each item contains exactly `amount`, `currency`, `reportingAmount`,
   `reportingCurrency`, and `fxState`. `reportingAmount` is `null` when
-  `fxState` is `missing` or `notComputable`; `fxState` uses the shared
-  `Confirmed`, `Stale`, `Estimated`, `Missing`, or `Not computable` states.
+  `fxState` is `missing` or `notComputable`; its canonical serialized values
+  are exactly `confirmed`, `stale`, `estimated`, `missing`, and
+  `notComputable`, corresponding to the shared Confirmed, Stale, Estimated,
+  Missing, and Not computable states.
 - A Financial Account may inherit an `ImportBatchSummary` with exactly
   `batchCount`, `latestReceivedAt`, `pendingRowCount`, `reviewState`, and
   `evidenceSummary.quality`.
