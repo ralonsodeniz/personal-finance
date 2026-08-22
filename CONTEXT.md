@@ -128,6 +128,30 @@ The currency in which a Reporting Portfolio presents values. Activities and
 Valuations retain their native amounts and dated conversion evidence.
 _Avoid_: Base currency, when it hides conversion policy
 
+**Provider**:
+An external institution, service, or source that supplies financial evidence
+about a Financial Account, Instrument, Holding, Valuation, or reference value.
+A Provider supplies evidence; it does not become the canonical owner of the
+app's Activity history.
+_Avoid_: Source, when provider identity matters
+
+**Provider Observation**:
+A dated record supplied by a Provider about a financial object, including its
+as-of time and quality. It is reconciled with canonical records and does not
+silently replace them.
+_Avoid_: Live value
+
+**Connection**:
+An authorized relationship between a User's Workspace and a Provider for
+selected Financial Accounts and data scopes. It has consent, refresh,
+re-authentication, and revocation state.
+_Avoid_: Credential, integration
+
+**Freshness Policy**:
+The rule that says how current a Provider Observation must be for a given source
+type and use. It is specific to the source and does not promise real-time data.
+_Avoid_: Universal real-time
+
 ## Collaboration
 
 **Workspace**:
