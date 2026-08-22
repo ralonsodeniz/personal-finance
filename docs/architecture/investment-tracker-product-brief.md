@@ -491,13 +491,17 @@ identifier and representation or location, along with its evidence state.
 Snapshot-backed Holding creation uses
 `POST /api/v1/financial-accounts/{financialAccountId}/holdings`. The request
 identifies the canonical Instrument and supplies the dated snapshot fields
-needed by the Holding model; the server binds the new Holding to the account,
-requires write access to that account's Workspace, and returns the Holding
-identifier with its snapshot provenance. It does not synthesize Activities or
-Lots from an incomplete snapshot. A later account-scoped or holding-scoped
-Valuation can then record the dated value without fabricating transaction
-history. The operation is idempotent and cannot attach a Holding to an
-unrelated account or Workspace.
+needed by the Holding model. The server resolves the Financial Account and
+Instrument in one transaction, requires both to belong to the same Workspace,
+and requires the actor's write access to that Workspace before creating the
+Holding. A cross-Workspace pair fails with a generic authorization/not-found
+Problem Details response and creates no resource, so the response cannot reveal
+which supplied identifier was outside the actor's scope. The operation returns
+the Holding identifier with its snapshot provenance. It does not synthesize
+Activities or Lots from an incomplete snapshot. A later account-scoped or
+holding-scoped Valuation can then record the dated value without fabricating
+transaction history. The operation is idempotent and cannot attach a Holding
+to an unrelated account or Workspace.
 Manual Valuation creation is nested under its owner: an account-level
 Valuation uses
 `POST /api/v1/financial-accounts/{financialAccountId}/valuations`, while a
