@@ -260,9 +260,10 @@ GET /api/v1/reconciliations/{reconciliationId}
 GET /api/v1/instruments/{instrumentId}
 POST /api/v1/import-batches/{importBatchId}/review
 POST /api/v1/reconciliations/{reconciliationId}/review
-POST /api/v1/financial-accounts
+POST /api/v1/workspaces/{workspaceId}/reporting-portfolios
+POST /api/v1/workspaces/{workspaceId}/financial-accounts
 POST /api/v1/financial-accounts/{financialAccountId}/holdings
-POST /api/v1/instruments
+POST /api/v1/workspaces/{workspaceId}/instruments
 POST /api/v1/financial-accounts/{financialAccountId}/valuations
 POST /api/v1/holdings/{holdingId}/valuations
 POST /api/v1/financial-accounts/{financialAccountId}/activities
@@ -336,11 +337,17 @@ representations:
   `costTotal`, `externalFlowTotal`, `stateCounts`, and
   `evidenceSummary.quality`. Each total is an array of `MoneySummary` items;
   each item contains exactly `amount`, `currency`, `reportingAmount`,
-  `reportingCurrency`, and `fxState`. `reportingAmount` is `null` when
-  `fxState` is `missing` or `notComputable`; its canonical serialized values
-  are exactly `confirmed`, `stale`, `estimated`, `missing`, and
-  `notComputable`, corresponding to the shared Confirmed, Stale, Estimated,
-  Missing, and Not computable states.
+  `reportingCurrency`, `fxState`, and `fxEvidence`. `fxEvidence` is either
+  `null` or an object containing exactly `rate`, `observedAt`,
+  `sourceDisplayName`, and `method`; the currency pair is derived from
+  `currency` and `reportingCurrency`. A non-null `reportingAmount` requires
+  non-null `fxEvidence`, including when `fxState` is `stale` or `estimated`.
+  `fxEvidence` is `null` when `fxState` is `missing` or `notComputable`; its
+  canonical serialized values are exactly `confirmed`, `stale`, `estimated`,
+  `missing`, and `notComputable`, corresponding to the shared Confirmed,
+  Stale, Estimated, Missing, and Not computable states. `method` is one of
+  `directObservation`, `boundedPriorObservation`, or `explicitEstimate` and
+  identifies how the rate was obtained.
 - A Financial Account may inherit an `ImportBatchSummary` with exactly
   `batchCount`, `latestReceivedAt`, `pendingRowCount`, `reviewState`, and
   `evidenceSummary.quality`.
@@ -486,8 +493,16 @@ evidence remains unchanged, and a retry with the same idempotency key returns
 the original identifiers and state.
 
 Manual-entry create operations are distinct from imports and Corrections:
-creating a Financial Account or Instrument returns that canonical resource's
-identifier and representation or location, along with its evidence state.
+root Financial Account and Instrument creation is Workspace-qualified:
+`POST /api/v1/workspaces/{workspaceId}/financial-accounts` and
+`POST /api/v1/workspaces/{workspaceId}/instruments` resolve the Workspace from
+the path, require the actor's active `owner` or `editor` Membership, and bind
+the new Resource to that Workspace. An inaccessible or cross-Workspace target
+returns a generic authorization/not-found Problem Details response and creates
+no resource. Neither operation relies on an undocumented default Workspace or
+accepts a client-selectable Workspace in the request body. Each returns its
+canonical resource's identifier and representation or location, along with
+its evidence state.
 Snapshot-backed Holding creation uses
 `POST /api/v1/financial-accounts/{financialAccountId}/holdings`. The request
 identifies the canonical Instrument and supplies the dated snapshot fields
@@ -516,6 +531,16 @@ binds the Activity to its Financial Account, and the server requires the
 actor's write access to that account's Workspace. It cannot create an orphan
 or cross-Workspace Activity. A Correction identifier is returned only when
 the operation reverses or supersedes an existing record.
+
+Reporting Portfolio bootstrap is explicit. The client creates the first or a
+later portfolio with
+`POST /api/v1/workspaces/{workspaceId}/reporting-portfolios`, supplying its
+display name and Reporting Currency. The server requires an active `owner` or
+`editor` Membership, binds the portfolio to that Workspace, and returns the
+new `reportingPortfolioId` and its representation. The operation is
+idempotent, does not implicitly select Financial Accounts, and does not rely
+on a hidden default portfolio; the returned identifier is then used for
+overview, account-selection, and Import Batch routes.
 
 Creating a Financial Account does not implicitly change any Reporting
 Portfolio. The manual-entry flow explicitly calls the idempotent `PUT
