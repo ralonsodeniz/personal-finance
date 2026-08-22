@@ -271,17 +271,41 @@ every field visible.
 
 Resource-level authorization runs first. A Resource Grant to a parent includes
 only the descendants listed below; it never grants siblings or a standalone
-Instrument Resource. Viewer access is read-only and summary-oriented. Tokens,
-credentials, raw source files or rows, and unredacted account identifiers are
-never serialized.
+Instrument Resource. Viewer access is read-only and summary-oriented. The v1
+`ResourceGrant` model has no field selector: `permission: view` is its only
+permission. The API therefore applies the fixed allowlists below and never
+accepts a client-supplied field list. Tokens, credentials, raw source files or
+rows, and unredacted account identifiers are never serialized through these
+views.
 
-| Authorized Resource                                  | Implicit descendants                                                                                           | Visible fields                                                                                                                                                              | Hidden unless explicitly granted                                                                                                                                                         |
-| ---------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Reporting Portfolio                                  | Financial Account summaries                                                                                    | Scope, name, Reporting Currency, total value, allocation, aggregate quality, health, and performance availability                                                           | Account detail and raw source evidence                                                                                                                                                   |
-| Financial Account                                    | Holding summaries, aggregate Activity/Import Batch/Reconciliation states, and nested Instrument display fields | Display label, type, Provider name, latest value, native currency, as-of date, quality, evidence coverage, Holding identity, quantity, value, currency, and Valuation state | Account numbers, tokens, source rows/files, full Activities, Lots, Tax Basis, and raw Provider Observations                                                                              |
-| Holding                                              | Canonical Instrument display fields                                                                            | Instrument name, type, public identifiers, Provider aliases, quantity, unit, native and Reporting Currency values, and Valuation source/as-of/quality                       | Standalone Instrument access, full Activities, Corporate Actions, Provenance, Reconciliation detail, and Tax Basis unless its wrapper, jurisdiction, evidence, and field grant permit it |
-| Activity, Valuation, Import Batch, or Reconciliation | None                                                                                                           | Typed date, amount, currency, state, and the scoped evidence needed for review                                                                                              | Credentials, unrelated Resource data, and unredacted source payload beyond allowed fields                                                                                                |
-| Instrument                                           | None                                                                                                           | Canonical identity, type, and public identifiers                                                                                                                            | Account ownership, quantities, and source-specific account evidence                                                                                                                      |
+For the rows that expose source or quality information, the fixed
+`evidenceSummary` object means exactly `sourceKind`, `providerDisplayName`,
+`observedAt`, `asOf`, `quality`, `coverageState`, and
+`reconciliationState`, where a field is applicable to that resource. It never
+contains a credential, raw Provider Observation, source row, source file, or
+unredacted account identifier. A direct `view` grant uses the target resource's
+allowlist and does not inherit to a sibling or to an unlisted descendant.
+
+| Authorized Resource | Implicit descendants                                                                                           | Visible fields                                                                                                                                                                                                                                            | Hidden from a v1 `view` grant                                                                                                               |
+| ------------------- | -------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| Reporting Portfolio | Financial Account summaries                                                                                    | `id`, `name`, `reportingCurrency`, `totalValue`, `valueAsOf`, `allocation`, `aggregateQuality`, `healthSummary`, `performanceAvailability`                                                                                                                | Financial Account detail and raw source evidence                                                                                            |
+| Financial Account   | Holding summaries, aggregate Activity/Import Batch/Reconciliation states, and nested Instrument display fields | `id`, `displayLabel`, `type`, `providerDisplayName`, `latestValue`, `nativeCurrency`, `valueAsOf`, `quality`, `evidenceSummary`, and each Holding's `instrumentDisplayName`, `instrumentType`, `quantity`, `unit`, `value`, `currency`, `valuationState`  | Account numbers, tokens, source rows/files, full Activities, Lots, Tax Basis, and raw Provider Observations                                 |
+| Holding             | Canonical Instrument display fields                                                                            | `id`, `instrumentDisplayName`, `instrumentType`, `publicIdentifiers`, `providerAliases`, `quantity`, `unit`, `nativeValue`, `nativeCurrency`, `reportingValue`, `reportingCurrency`, `valuation.sourceDisplayName`, `valuation.asOf`, `valuation.quality` | Standalone Instrument access, full Activities, Corporate Actions, Provenance, Reconciliation detail, Tax Basis, and all raw source evidence |
+| Activity            | None                                                                                                           | `id`, `activityType`, `economicDate`, `settlementDate`, `amount`, `currency`, `state`, and `evidenceSummary`                                                                                                                                              | Counterparty details, credentials, unrelated Resource data, source rows/files, and unredacted source payload                                |
+| Valuation           | None                                                                                                           | `id`, `asOf`, `value`, `quantity`, `unitPrice`, `currency`, `state`, and `evidenceSummary`                                                                                                                                                                | Credentials, unrelated Resource data, raw Provider Observations, source rows/files, and unredacted source payload                           |
+| Import Batch        | None                                                                                                           | `id`, `status`, `receivedAt`, `sourceAsOf`, `reviewState`, `rowCounts.pending`, `rowCounts.mapped`, `rowCounts.duplicate`, `rowCounts.rejected`, and `evidenceSummary`                                                                                    | Source filename/content, source rows/files, credentials, mapped canonical records outside the grant, and unredacted source payload          |
+| Reconciliation      | None                                                                                                           | `id`, `resourceType`, `resourceId`, `asOf`, `state`, `applicationValue`, `sourceValue`, `difference`, `currency`, and `evidenceSummary`                                                                                                                   | Credentials, unrelated Resource data, source rows/files, raw Provider Observations, and unredacted source payload                           |
+| Instrument          | None                                                                                                           | `id`, `displayName`, `type`, `publicIdentifiers`, and `providerAliases`                                                                                                                                                                                   | Account ownership, quantities, holdings, and source-specific account evidence                                                               |
+
+`Tax Basis`, Lots, Corporate Actions, and raw Provider Observations are not
+available through a v1 Resource Grant, including an inherited grant. A
+same-Workspace member view may include Tax Basis only in a purpose-built tax
+representation when the account wrapper, tax jurisdiction, and required
+source evidence are present; otherwise it returns `Not computable`. Adding
+grant access to those fields requires a future authorization-model change and
+schema review rather than an ad-hoc request field. Phase 0 must test every
+allowlist above, including direct grants, inherited summaries, and the absence
+of hidden fields.
 
 ### Overview representation
 
@@ -314,9 +338,16 @@ Creating a Financial Account does not implicitly change any Reporting
 Portfolio. The manual-entry flow explicitly calls the idempotent `PUT
 /api/v1/reporting-portfolios/{reportingPortfolioId}/accounts/{financialAccountId}`
 membership operation after creation; its response reports the resulting
-selection state. An atomic create-and-include command may combine those two
-results only when it declares both the created Financial Account and the
-Reporting Portfolio membership.
+selection state. The membership operation is authorized only when the
+Reporting Portfolio and Financial Account resolve to the same `workspaceId`
+and the acting user has an active `owner` or `editor` Membership in that
+Workspace. A `ResourceGrant`—which is `view`-only in v1—cannot authorize this
+write. The check and membership write occur in one transaction; a
+cross-Workspace pair fails with a generic authorization/not-found Problem
+Details response and creates no membership. An atomic create-and-include
+command must create the Financial Account in the Reporting Portfolio's
+Workspace and must enforce the same conditions before committing either
+result.
 
 All financial responses default to `Cache-Control: private, no-store` until a
 resource-specific review approves a safer policy. Response errors use the
@@ -353,7 +384,8 @@ product analytics, or error telemetry.
 - Add contract tests for runtime schemas, OpenAPI examples, Problem Details,
   and generated-client reproducibility.
 - Add application tests for scope, evidence quality, calculation availability,
-  policy defaults, and Field visibility.
+  policy defaults, the field allowlists above, and cross-Workspace membership
+  authorization.
 - Add route tests for validation, authorization, serialization, cache behavior,
   unsupported methods, and Problem Details errors.
 - Add web tests for accessible content, mobile layout, loading and error states,
