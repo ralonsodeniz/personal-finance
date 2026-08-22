@@ -262,7 +262,8 @@ POST /api/v1/import-batches/{importBatchId}/review
 POST /api/v1/reconciliations/{reconciliationId}/review
 POST /api/v1/financial-accounts
 POST /api/v1/instruments
-POST /api/v1/valuations
+POST /api/v1/financial-accounts/{financialAccountId}/valuations
+POST /api/v1/holdings/{holdingId}/valuations
 POST /api/v1/financial-accounts/{financialAccountId}/activities
 ```
 
@@ -484,9 +485,17 @@ evidence remains unchanged, and a retry with the same idempotency key returns
 the original identifiers and state.
 
 Manual-entry create operations are distinct from imports and Corrections:
-creating a Financial Account, Instrument, or Valuation returns that canonical
-resource's identifier and representation or location, along with its evidence
-state. Manual Activity creation uses
+creating a Financial Account or Instrument returns that canonical resource's
+identifier and representation or location, along with its evidence state.
+Manual Valuation creation is nested under its owner: an account-level
+Valuation uses
+`POST /api/v1/financial-accounts/{financialAccountId}/valuations`, while a
+Holding-level Valuation uses `POST /api/v1/holdings/{holdingId}/valuations`.
+The server resolves the target from the path, requires the actor's write
+access to the owning Financial Account's Workspace, and verifies that the
+Holding belongs to that account before accepting the Valuation. Neither route
+accepts a client-selectable unrelated target, so manual Valuations cannot be
+orphaned or attached across Workspaces. Manual Activity creation uses
 `POST /api/v1/financial-accounts/{financialAccountId}/activities`; the path
 binds the Activity to its Financial Account, and the server requires the
 actor's write access to that account's Workspace. It cannot create an orphan
