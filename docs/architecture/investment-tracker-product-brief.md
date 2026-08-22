@@ -328,8 +328,9 @@ The GitHub issues linked here are the execution handoff. They are intentionally
 smaller than the decision map and should not reopen the A+ hierarchy or the
 manual-first provider decision.
 
-- API contracts, fixtures, and read models
-- Overview route and Reporting Portfolio summary
-- Health, Import Batch review, and Reconciliation actions
-- Financial Account, Holding, and Instrument detail
-- Performance, allocation, income, and cost reporting
+- [Investment API contracts, fixtures, and read models](https://github.com/ralonsodeniz/personal-finance/issues/65)
+- [Investment overview route and Reporting Portfolio summary](https://github.com/ralonsodeniz/personal-finance/issues/66)
+- [Investment health, Import Batch review, and Reconciliation](https://github.com/ralonsodeniz/personal-finance/issues/67)
+- [Financial Account, Holding, and Instrument detail](https://github.com/ralonsodeniz/personal-finance/issues/68)
+- [Investment performance, allocation, income, and cost reporting](https://github.com/ralonsodeniz/personal-finance/issues/69)
+- [Manual investment entry and staged CSV/XLSX imports](https://github.com/ralonsodeniz/personal-finance/issues/70)
