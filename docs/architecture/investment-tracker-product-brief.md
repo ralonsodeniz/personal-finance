@@ -261,6 +261,7 @@ GET /api/v1/instruments/{instrumentId}
 POST /api/v1/import-batches/{importBatchId}/review
 POST /api/v1/reconciliations/{reconciliationId}/review
 POST /api/v1/financial-accounts
+POST /api/v1/financial-accounts/{financialAccountId}/holdings
 POST /api/v1/instruments
 POST /api/v1/financial-accounts/{financialAccountId}/valuations
 POST /api/v1/holdings/{holdingId}/valuations
@@ -436,10 +437,10 @@ The overview read model should contain:
 
 Every retryable `POST` mutation in this contract requires an
 `Idempotency-Key`: import-batch creation, Import Batch review,
-reconciliation review, and manual Financial Account, Instrument, Valuation,
-and Activity creation. The key is scoped to the authenticated user, route,
-and target Workspace. The server stores the request fingerprint and completed
-response; a retry with the same key and body returns the original status,
+reconciliation review, and manual Financial Account, Instrument, Holding,
+Valuation, and Activity creation. The key is scoped to the authenticated user,
+route, and target Workspace. The server stores the request fingerprint and
+completed response; a retry with the same key and body returns the original status,
 identifiers, representation, and state without creating another resource. A
 same key with a different body or target fails with an idempotency-key-reuse
 Problem Details response and performs no write.
@@ -487,6 +488,16 @@ the original identifiers and state.
 Manual-entry create operations are distinct from imports and Corrections:
 creating a Financial Account or Instrument returns that canonical resource's
 identifier and representation or location, along with its evidence state.
+Snapshot-backed Holding creation uses
+`POST /api/v1/financial-accounts/{financialAccountId}/holdings`. The request
+identifies the canonical Instrument and supplies the dated snapshot fields
+needed by the Holding model; the server binds the new Holding to the account,
+requires write access to that account's Workspace, and returns the Holding
+identifier with its snapshot provenance. It does not synthesize Activities or
+Lots from an incomplete snapshot. A later account-scoped or holding-scoped
+Valuation can then record the dated value without fabricating transaction
+history. The operation is idempotent and cannot attach a Holding to an
+unrelated account or Workspace.
 Manual Valuation creation is nested under its owner: an account-level
 Valuation uses
 `POST /api/v1/financial-accounts/{financialAccountId}/valuations`, while a
@@ -570,7 +581,8 @@ product analytics, or error telemetry.
 
 ### Phase 1: manual and file-based v1
 
-- Add manual Financial Account, Instrument, Valuation, and Activity entry.
+- Add manual Financial Account, Instrument, snapshot-backed Holding, Valuation,
+  and Activity entry.
 - Accept MyInvestor-shaped CSV/XLSX through staged Import Batches.
 - Build the overview, account detail, and health/import review surfaces.
 - Keep all review actions append-only and provenance-aware.
