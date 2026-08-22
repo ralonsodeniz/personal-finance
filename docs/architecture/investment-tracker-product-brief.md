@@ -245,6 +245,7 @@ GET /api/v1/reporting-portfolios/{reportingPortfolioId}/overview
 GET /api/v1/reporting-portfolios/{reportingPortfolioId}/health
 GET /api/v1/reporting-portfolios/{reportingPortfolioId}/accounts
 GET /api/v1/reporting-portfolios/{reportingPortfolioId}/accounts/{financialAccountId}
+PUT /api/v1/reporting-portfolios/{reportingPortfolioId}/accounts/{financialAccountId}
 GET /api/v1/reporting-portfolios/{reportingPortfolioId}/holdings/{holdingId}
 GET /api/v1/reporting-portfolios/{reportingPortfolioId}/performance
 GET /api/v1/reporting-portfolios/{reportingPortfolioId}/activity
@@ -265,6 +266,22 @@ The application layer applies Reporting Portfolio scope, Resource-level
 authorization, and Field visibility before route serialization, caching, or
 generated-client responses. An authorized Resource does not automatically make
 every field visible.
+
+### v1 field-visibility matrix
+
+Resource-level authorization runs first. A Resource Grant to a parent includes
+only the descendants listed below; it never grants siblings or a standalone
+Instrument Resource. Viewer access is read-only and summary-oriented. Tokens,
+credentials, raw source files or rows, and unredacted account identifiers are
+never serialized.
+
+| Authorized Resource                                  | Implicit descendants                                                                                           | Visible fields                                                                                                                                                              | Hidden unless explicitly granted                                                                                                                                                         |
+| ---------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Reporting Portfolio                                  | Financial Account summaries                                                                                    | Scope, name, Reporting Currency, total value, allocation, aggregate quality, health, and performance availability                                                           | Account detail and raw source evidence                                                                                                                                                   |
+| Financial Account                                    | Holding summaries, aggregate Activity/Import Batch/Reconciliation states, and nested Instrument display fields | Display label, type, Provider name, latest value, native currency, as-of date, quality, evidence coverage, Holding identity, quantity, value, currency, and Valuation state | Account numbers, tokens, source rows/files, full Activities, Lots, Tax Basis, and raw Provider Observations                                                                              |
+| Holding                                              | Canonical Instrument display fields                                                                            | Instrument name, type, public identifiers, Provider aliases, quantity, unit, native and Reporting Currency values, and Valuation source/as-of/quality                       | Standalone Instrument access, full Activities, Corporate Actions, Provenance, Reconciliation detail, and Tax Basis unless its wrapper, jurisdiction, evidence, and field grant permit it |
+| Activity, Valuation, Import Batch, or Reconciliation | None                                                                                                           | Typed date, amount, currency, state, and the scoped evidence needed for review                                                                                              | Credentials, unrelated Resource data, and unredacted source payload beyond allowed fields                                                                                                |
+| Instrument                                           | None                                                                                                           | Canonical identity, type, and public identifiers                                                                                                                            | Account ownership, quantities, and source-specific account evidence                                                                                                                      |
 
 ### Overview representation
 
@@ -292,6 +309,14 @@ Corrections: creating a Financial Account, Instrument, Valuation, or Activity
 returns that canonical resource's identifier and representation or location,
 along with its evidence state. A Correction identifier is returned only when
 the operation reverses or supersedes an existing record.
+
+Creating a Financial Account does not implicitly change any Reporting
+Portfolio. The manual-entry flow explicitly calls the idempotent `PUT
+/api/v1/reporting-portfolios/{reportingPortfolioId}/accounts/{financialAccountId}`
+membership operation after creation; its response reports the resulting
+selection state. An atomic create-and-include command may combine those two
+results only when it declares both the created Financial Account and the
+Reporting Portfolio membership.
 
 All financial responses default to `Cache-Control: private, no-store` until a
 resource-specific review approves a safer policy. Response errors use the
