@@ -220,6 +220,10 @@ GET /v1/reporting-portfolios/{reportingPortfolioId}/activity
 POST /v1/reporting-portfolios/{reportingPortfolioId}/import-batches
 GET /v1/import-batches/{importBatchId}
 POST /v1/import-batches/{importBatchId}/review
+POST /v1/financial-accounts
+POST /v1/instruments
+POST /v1/valuations
+POST /v1/activities
 ```
 
 These paths are a starting boundary for contract design. They do not authorize
@@ -244,13 +248,16 @@ The overview read model should contain:
 
 ### Mutations
 
-Import and manual-entry mutations should be idempotent where retries can occur.
-They should return an Import Batch or Correction identifier and a review state,
-not pretend that the final holdings are synchronously complete. The review
-surface then reads the batch and applies accepted mappings through the canonical
-Activity model.
+Retryable import and manual-entry mutations should be idempotent. Import
+operations return an Import Batch identifier and review state; the review
+surface reads the batch and applies accepted mappings through the canonical
+Activity model. Manual-entry create operations are distinct from imports and
+Corrections: creating a Financial Account, Instrument, Valuation, or Activity
+returns that canonical resource's identifier and representation or location,
+along with its evidence state. A Correction identifier is returned only when
+the operation reverses or supersedes an existing record.
 
-All financial responses default to private or no-store cache policy until a
+All financial responses default to `Cache-Control: private, no-store` until a
 resource-specific review approves a safer policy. Response errors use the
 repository's planned `application/problem+json` boundary. Financial values,
 source rows, tokens, and account identifiers must not enter operational logs,
