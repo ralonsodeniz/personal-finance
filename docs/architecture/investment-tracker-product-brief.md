@@ -244,6 +244,7 @@ The first contract set should cover these representations:
 GET /api/v1/reporting-portfolios/{reportingPortfolioId}/overview
 GET /api/v1/reporting-portfolios/{reportingPortfolioId}/health
 GET /api/v1/reporting-portfolios/{reportingPortfolioId}/accounts
+GET /api/v1/reporting-portfolios/{reportingPortfolioId}/accounts/{financialAccountId}
 GET /api/v1/reporting-portfolios/{reportingPortfolioId}/holdings/{holdingId}
 GET /api/v1/reporting-portfolios/{reportingPortfolioId}/performance
 GET /api/v1/reporting-portfolios/{reportingPortfolioId}/activity
